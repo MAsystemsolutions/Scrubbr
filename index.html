@@ -357,7 +357,7 @@ const Scrub = (() => {
   const FAKE_DOMAIN = new Set(['example.com','example.org','test.com','test.net','fake.com','asdf.com','mailinator.com','domain.com','sample.com','noemail.com','none.com']);
   const FAKE_NAME = /\b(test|asdf|qwerty|fake|dummy|sample|xxx|unknown)\b/i;
   const DOMAIN_FIX = {'gmial.com':'gmail.com','gmai.com':'gmail.com','gmail.co':'gmail.com','gamil.com':'gmail.com','gnail.com':'gmail.com','gmaill.com':'gmail.com','yaho.com':'yahoo.com','yahooo.com':'yahoo.com','yhoo.com':'yahoo.com','hotmial.com':'hotmail.com','hotmai.com':'hotmail.com','hotmal.com':'hotmail.com','outlok.com':'outlook.com','outloo.com':'outlook.com','iclod.com':'icloud.com','icoud.com':'icloud.com'};
-  const NICK = [['john','jon','johnny','jack'],['michael','mike','mikey','mick'],['daniel','dan','danny'],['robert','rob','bob','bobby','bert'],['william','will','bill','billy','liam'],['james','jim','jimmy','jamie'],['christopher','chris','topher'],['joseph','joe','joey'],['thomas','tom','tommy'],['steven','stephen','steve'],['richard','rick','rich','dick'],['anthony','tony'],['matthew','matt'],['andrew','andy','drew'],['benjamin','ben','benji'],['nicholas','nick','nico'],['alexander','alex','xander'],['elizabeth','liz','beth','lizzy','eliza'],['katherine','catherine','kate','katie','kathy','cathy'],['jennifer','jen','jenny'],['patricia','pat','patty','trish'],['margaret','maggie','meg','peggy'],['rebecca','becky','becca'],['samantha','sam'],['samuel','sam','sammy'],['jessica','jess','jessie'],['victoria','vicky','tori'],['deborah','debbie','deb'],['susan','sue','susie'],['angela','angie'],['ramon','mon'],['francisco','frank','kiko'],['jose','pepe'],['edward','ed','eddie','ted']];
+  const NICK = [['john','jon','johnny','jack'],['michael','mike','mikey','mick'],['daniel','dan','danny'],['robert','rob','bob','bobby','bert'],['william','will','bill','billy','liam'],['james','jim','jimmy','jamie'],['christopher','chris','topher'],['joseph','joe','joey'],['thomas','tom','tommy'],['steven','stephen','steve'],['richard','rick','rich','dick'],['anthony','tony'],['matthew','matt'],['andrew','andy','drew'],['benjamin','ben','benji'],['nicholas','nick','nico'],['alexander','alex','xander'],['elizabeth','liz','beth','lizzy','eliza'],['katherine','catherine','kate','katie','kathy','cathy'],['jennifer','jen','jenny'],['patricia','pat','patty','trish'],['margaret','maggie','meg','peggy'],['rebecca','becky','becca'],['samantha','sam'],['samuel','sam','sammy'],['jessica','jess','jessie'],['victoria','vicky','tori'],['deborah','debbie','deb'],['susan','sue','susie'],['angela','angie'],['ramon','mon'],['brian','bryan'],['jon','john'],['steven','steve'],['sara','sarah'],['jeffrey','geoffrey','jeff'],['philip','phillip','phil'],['allan','alan','allen','al'],['francisco','frank','kiko'],['jose','pepe'],['edward','ed','eddie','ted']];
   const NICKMAP = {}; NICK.forEach(g => g.forEach(n => { if (!NICKMAP[n]) NICKMAP[n] = g[0]; }));
 
   const clean = s => (s == null ? '' : String(s)).replace(/[\u00A0\u2000-\u200B\uFEFF]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -607,7 +607,7 @@ const Scrub = (() => {
     if (A.lastKey && A.lastKey === B.lastKey && A.firstKey && B.firstKey) {
       if (canon(A.firstKey) === canon(B.firstKey)) s = Math.max(s, 0.96);
       else if ((A.firstKey.length === 1 || B.firstKey.length === 1) && A.firstKey[0] === B.firstKey[0]) s = Math.max(s, 0.9);
-      else if (jw(A.firstKey, B.firstKey) < 0.85) s = Math.min(s, 0.8); // same surname, clearly different first names
+      else if (jw(A.firstKey, B.firstKey) < 0.92) s = Math.min(s, 0.8); // same surname, clearly different first names
     }
     return s;
   }
@@ -690,12 +690,12 @@ const Scrub = (() => {
       const sameDomain = A.domain && A.domain === B.domain;
       let reason = null, score = 0;
       if (samePhone) { reason = 'Same phone number but different names — could be a shared office line'; score = 0.6; }
-      else if (ns >= 0.85 && cs >= 0.85) {
+      else if (ns >= 0.9 && cs >= 0.85) {
         reason = sameCo ? 'Similar names at the same company, but different email and phone'
           : `Similar names at similar companies (“${A.company}” vs “${B.company}”) — could be different businesses`;
         score = (ns + cs) / 2;
       }
-      else if (ns >= 0.9 && sameDomain) { reason = 'Similar names on the same company email domain'; score = ns; }
+      else if (ns >= 0.93 && sameDomain) { reason = 'Similar names on the same company email domain'; score = ns; }
       if (reason) reviewPairs.push({a, b, reason, score});
     }
     const byRoot = new Map();
@@ -703,13 +703,12 @@ const Scrub = (() => {
     const groups = [...byRoot.values()].map(ids => ({ids}));
     const gOf = new Array(n); groups.forEach((g, gi) => g.ids.forEach(id => gOf[id] = gi));
     const rp = reviewPairs.filter(p => gOf[p.a] !== gOf[p.b]);
-    const guf = new UF(groups.length);
-    rp.forEach(p => guf.union(gOf[p.a], gOf[p.b]));
+    // one review item per PAIR of groups — never chain A~B~C into one giant item
     const comps = new Map();
     rp.forEach(p => {
-      const c = guf.find(gOf[p.a]);
-      if (!comps.has(c)) comps.set(c, {gs: new Set(), pairs: []});
-      const o = comps.get(c); o.gs.add(gOf[p.a]); o.gs.add(gOf[p.b]); o.pairs.push(p);
+      const ga = Math.min(gOf[p.a], gOf[p.b]), gb = Math.max(gOf[p.a], gOf[p.b]), c = ga + '-' + gb;
+      if (!comps.has(c)) comps.set(c, {gs: new Set([ga, gb]), pairs: []});
+      comps.get(c).pairs.push(p);
     });
     const items = [], inItem = new Set();
     for (const o of comps.values()) {
@@ -779,7 +778,7 @@ const Scrub = (() => {
       const d = dec[it.id]; const us = it.groups.map(g => gUnit[g]).filter(u => u >= 0);
       us.forEach(u => unitItem.set(u, it));
       if (!d) { us.forEach(u => pending.add(u)); continue; }
-      if (it.type === 'duplicate' && d.action === 'merge') { us.forEach(u => uuf.union(us[0], u)); reviewRemoved += us.length - 1; }
+      if (it.type === 'duplicate' && d.action === 'merge') { us.forEach(u => { if (uuf.find(us[0]) !== uuf.find(u)) { uuf.union(us[0], u); reviewRemoved++; } }); }
     }
     const clusters = new Map();
     units.forEach((u, ui) => {
@@ -788,13 +787,12 @@ const Scrub = (() => {
       const c = clusters.get(r); c.ids.push(...u.ids); if (pending.has(ui)) c.pending = true; if (unitItem.has(ui)) c.item = unitItem.get(ui);
     });
     const masters = [], pendingClusters = [];
-    let dupRemoved = 0;
+    const autoRemoved = units.reduce((n, u) => n + (u.auto ? u.ids.length - 1 : 0), 0);
     for (const c of clusters.values()) {
       if (c.pending) { pendingClusters.push(c); continue; }
       const d = c.item && dec[c.item.id];
       const choices = d && d.action === 'merge' ? d.fields : null;
       const m = buildMaster(recs, c.ids, choices);
-      dupRemoved += c.ids.length - 1;
       masters.push(m);
     }
     const clean = [], held = [], excluded = [];
@@ -813,7 +811,7 @@ const Scrub = (() => {
     const pendingItems = items.filter(it => !dec[it.id]).length;
     const heldUndecided = held.length;
     return {masters, clean, held, excluded, pendingClusters, changes,
-      stats: {recordsIn: recs.length, files: Object.keys(byFile).length, byFile, dupRemoved, reviewRemoved, autoRemoved: dupRemoved - reviewRemoved,
+      stats: {recordsIn: recs.length, files: Object.keys(byFile).length, byFile, dupRemoved: autoRemoved + reviewRemoved, reviewRemoved, autoRemoved,
         fieldsCorrected: changes.length, byField, byIssue, pendingItems, heldUndecided, needsReview: pendingItems + heldUndecided,
         clean: clean.length, excluded: excluded.length, warned: clean.filter(m => m.warnings.length).length,
         recordsCorrected: recs.filter(r => r.changes.length).length}};
@@ -1102,17 +1100,48 @@ const Scrub = (() => {
   function defaultChoices(it) {
     const c = {}; it.fields.forEach(f => { const o = Scrub.options(S.recs, it.ids, f); if (o.length) c[f] = o[0].rec.id; }); return c;
   }
+  const RPAGE = 10, FPAGE = 25;
+  function miniPager(key, total, size) {
+    const pages = Math.max(1, Math.ceil(total / size)); if ((S.page[key] || 0) >= pages) S.page[key] = pages - 1;
+    const p = S.page[key] || 0; if (pages <= 1) return '';
+    return `<div class="pager"><span>Showing ${p * size + 1}–${Math.min(total, (p + 1) * size)} of ${total}</span>
+      <span class="row"><button class="btn sm" data-pg="${key}" data-d="-1" ${p === 0 ? 'disabled' : ''}>← Prev</button><button class="btn sm" data-pg="${key}" data-d="1" ${p >= pages - 1 ? 'disabled' : ''}>Next →</button></span></div>`;
+  }
   function renderReview() {
-    const items = S.an.items.slice().sort((a, b) => (!!S.dec[a.id]) - (!!S.dec[b.id]));
+    S.page.rev = S.page.rev || 0; S.page.flag = S.page.flag || 0;
+    const open = S.an.items.filter(i => !S.dec[i.id]).sort((a, b) => b.score - a.score);
+    const done = S.an.items.filter(i => S.dec[i.id]);
+    const items = [...open, ...done];
     const held = S.res.held, decidedFlags = S.res.masters.filter(m => m.blocking.length && S.fdec[m.key]);
+    const hi = open.filter(i => i.score >= 0.9).length;
     let html = '';
-    html += `<div class="sechead"><h2>Possible duplicates &amp; conflicts</h2><span class="muted">${items.filter(i => !S.dec[i.id]).length} to decide</span></div>`;
+
+    html += `<div class="sechead"><h2>Possible duplicates &amp; conflicts</h2><span class="muted">${open.length} to decide</span></div>`;
+    if (open.length) html += `<div class="card pad" style="padding:14px 18px;margin-bottom:14px"><div class="spread">
+      <span class="muted" style="font-size:13.5px">Too many to check one by one? Decide them in bulk:</span>
+      <div class="row">
+        <button class="btn accent sm" data-bulk="merge-hi" ${hi ? '' : 'disabled'}>Merge all ≥90% confidence (${hi})</button>
+        <button class="btn sm" data-bulk="merge-all">Merge all (${open.length})</button>
+        <button class="btn sm" data-bulk="sep-all">Keep all separate</button>
+      </div></div></div>`;
     if (!items.length) html += `<div class="card empty">${ICON.check}<div>No uncertain matches — every duplicate was clear-cut.</div></div>`;
-    items.forEach(it => html += reviewCard(it));
+    const rp = S.page.rev;
+    items.slice(rp * RPAGE, (rp + 1) * RPAGE).forEach(it => html += reviewCard(it));
+    html += miniPager('rev', items.length, RPAGE);
+
     html += `<div class="sechead" style="margin-top:28px"><h2>Incomplete or suspicious records</h2><span class="muted">${held.length} to decide</span></div>`;
+    if (held.length) {
+      const byReason = {}; held.forEach(m => m.blocking.forEach(b => byReason[b] = (byReason[b] || 0) + 1));
+      html += `<div class="card pad" style="padding:14px 18px;margin-bottom:14px">
+        <div class="muted" style="font-size:13.5px;margin-bottom:10px">Decide by reason:</div>
+        ${Object.entries(byReason).sort((a, b) => b[1] - a[1]).map(([r, n]) => `<div class="spread" style="padding:6px 0;border-top:1px solid var(--line)">
+          <span><span class="chip red">${esc(r)}</span> <b>${n}</b></span>
+          <span class="row"><button class="btn sm" data-fbulk="approve" data-reason="${esc(r)}">Approve all</button><button class="btn sm" data-fbulk="exclude" data-reason="${esc(r)}">Exclude all</button></span></div>`).join('')}
+      </div>`;
+    }
     const flagRows = [...held, ...decidedFlags];
     if (!flagRows.length) html += `<div class="card empty">${ICON.check}<div>No flagged records.</div></div>`;
-    else html += `<div class="card">${flagRows.map(flagRow).join('')}</div>`;
+    else { const fp = S.page.flag; html += `<div class="card">${flagRows.slice(fp * FPAGE, (fp + 1) * FPAGE).map(flagRow).join('')}</div>` + miniPager('flag', flagRows.length, FPAGE); }
     $('#panel-review').innerHTML = html;
   }
   function reviewCard(it) {
@@ -1165,6 +1194,17 @@ const Scrub = (() => {
     else if (ds.approve) { S.fdec[ds.approve] = 'approve'; toast('Approved — moved to clean leads'); }
     else if (ds.exclude) { S.fdec[ds.exclude] = 'exclude'; toast('Excluded'); }
     else if (ds.fundo) delete S.fdec[ds.fundo];
+    else if (ds.bulk) {
+      const open = S.an.items.filter(i => !S.dec[i.id]);
+      const pick = ds.bulk === 'merge-hi' ? open.filter(i => i.score >= 0.9) : open;
+      pick.forEach(it => { S.dec[it.id] = ds.bulk === 'sep-all' ? {action: 'separate'} : {action: 'merge', fields: Object.assign(defaultChoices(it), S.choices[it.id] || {})}; });
+      S.page.rev = 0; toast(`${pick.length} matches ${ds.bulk === 'sep-all' ? 'kept separate' : 'merged'}`);
+    }
+    else if (ds.fbulk) {
+      const list = S.res.held.filter(m => m.blocking.includes(ds.reason));
+      list.forEach(m => S.fdec[m.key] = ds.fbulk);
+      S.page.flag = 0; toast(`${list.length} records ${ds.fbulk === 'approve' ? 'approved' : 'excluded'}`);
+    }
     else return;
     const y = window.scrollY; recompute(); window.scrollTo(0, y);
   });
