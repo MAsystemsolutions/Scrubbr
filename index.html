@@ -200,6 +200,15 @@ tr:last-child td{border-bottom:0}
 .after{color:var(--accent-ink);font-weight:500}
 .footer{padding:24px 0 40px;text-align:center;font-size:12.5px;color:var(--muted)}
 
+/* Demo mode */
+.modesw{display:flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface);margin-left:10px}
+.modesw button{border:0;background:none;padding:5px 12px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
+.modesw button.on{background:var(--ink);color:var(--bg)}
+.modesw button.on[data-setmode="demo"]{background:var(--lilac);color:#fff}
+.demobar{background:var(--lilac-soft);color:var(--lilac);border-bottom:1px solid var(--line);font-size:13.5px}
+.demobar .wrap{display:flex;align-items:center;gap:10px;justify-content:center;min-height:42px;flex-wrap:wrap;padding-top:6px;padding-bottom:6px;text-align:center}
+.demobar button{border:1px solid currentColor;background:none;color:inherit;border-radius:999px;padding:3px 12px;cursor:pointer;font-weight:600;font-size:12.5px}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -227,8 +236,10 @@ tr:last-child td{border-bottom:0}
       <div class="step" data-step="2"><b>2</b><span>Map columns</span></div>
       <div class="step" data-step="3"><b>3</b><span>Review &amp; export</span></div>
     </nav>
+    <div class="modesw no-print" role="group" aria-label="Mode"><button data-setmode="live" class="on">Live</button><button data-setmode="demo">Demo</button></div>
   </div>
 </header>
+<div class="demobar no-print hidden" id="demoBar"><div class="wrap">🧪 <b>Demo mode</b> — you're looking at sample leads. Click around, review matches, try the exports. <button data-setmode="live">Switch to Live mode to use your own list</button></div></div>
 
 <main class="wrap">
 
@@ -239,6 +250,7 @@ tr:last-child td{border-bottom:0}
       <div class="pill">● Lead cleanup &amp; deduplication</div>
       <h1>Messy leads in.<br><em>Clean leads out.</em></h1>
       <p>Scrubbr fixes names, emails, phones and company names, merges duplicates, flags fake or incomplete records, and hands you a CRM-ready list plus a before-and-after report.</p>
+      <div class="row" style="margin-top:20px"><button class="btn primary" data-setmode="demo">▶ See it in Demo mode</button><span class="muted" style="font-size:13px">or drop your own list below</span></div>
     </div>
     <div class="bubbles" aria-hidden="true">
       <span style="width:120px;height:120px;left:12%;top:30px"></span>
@@ -1281,7 +1293,7 @@ Owner: Teresa Lin`;
   }
   document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { S.tab = t.dataset.tab; renderResults(); } });
   $('#backMap').addEventListener('click', () => { renderMap(); go(2); });
-  $('#restartBtn').addEventListener('click', () => { if (!confirm('Start over? Your review decisions will be cleared.')) return; S.files = []; renderFiles(); go(1); });
+  $('#restartBtn').addEventListener('click', () => { if (S.mode === 'demo') return setMode('live'); if (!confirm('Start over? Your review decisions will be cleared.')) return; S.files = []; renderFiles(); go(1); });
 
   /* report */
   function bars(obj, cls) {
@@ -1533,8 +1545,37 @@ Owner: Teresa Lin`;
   function printReport() { S.tab = 'report'; renderResults(); setTimeout(() => window.print(), 50); }
   $('#printBtn').addEventListener('click', printReport);
 
+  /* ---------- demo mode ---------- */
+  S.mode = 'live';
+  function setMode(mode) {
+    if (mode === S.mode && mode === 'live') return;
+    S.mode = mode;
+    document.querySelectorAll('.modesw button').forEach(b => b.classList.toggle('on', b.dataset.setmode === mode));
+    $('#demoBar').classList.toggle('hidden', mode !== 'demo');
+    S.files = []; S.extracted = []; S.res = null; $('#exResult').innerHTML = ''; $('#exBox').value = '';
+    ['#efFirst', '#efLast', '#efDomain', '#efCompany'].forEach(id => $(id).value = '');
+    if (mode === 'demo') {
+      Scrub.sampleFiles().forEach(f => addFile(f.name, f.headers, f.rows));
+      const ex = Scrub.extractLeads(EX_SAMPLE, 'Austin business directory');
+      addFile('Extracted leads', ['Name', 'Email', 'Phone', 'Company', 'Job Title', 'Website', 'Lead Source'],
+        ex.map(l => ({Name: l.name, Email: l.email, Phone: l.phone, Company: l.company, 'Job Title': l.title, Website: l.website, 'Lead Source': l.source})));
+      $('#exBox').value = EX_SAMPLE; $('#exSource').value = 'Austin business directory';
+      $('#efFirst').value = 'John'; $('#efLast').value = 'Smith'; $('#efDomain').value = 'brightpathsolar.com'; $('#efCompany').value = 'BrightPath Solar';
+      $('#country').value = 'US';
+      renderFinder();
+      $('#scrubBtn').click();
+      toast('Demo mode — sample data loaded');
+    } else {
+      renderFiles(); renderFinder(); go(1);
+      document.querySelector('[data-itab="files"]').click();
+      toast('Live mode — add your own lead list');
+    }
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-setmode]'); if (b) setMode(b.dataset.setmode); });
+
   renderFiles();
   go(1);
+  if (/[?&#]demo\b/.test(location.search + location.hash)) setMode('demo');
 })();
 </script>
 </body>
