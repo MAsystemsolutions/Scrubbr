@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrubbr — Lead Cleanup & Deduplication</title>
+<meta name="description" content="Scrubbr cleans messy lead lists: fixes names, emails, phones and companies, finds duplicates, flags bad records, and exports CRM-ready leads. Runs entirely in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F6F1; --surface:#FFFFFF; --surface2:#F9FAF7; --ink:#0E1B1A; --muted:#5B6B68; --line:#E1E6DF;
+  --accent:#16B985; --accent-ink:#0A5C47; --accent-soft:#DDF7EC; --suds:#BFF3DF;
+  --lilac:#6C5CE7; --lilac-soft:#ECE9FF; --amber:#C77A0A; --amber-soft:#FFF1DA; --red:#D63C42; --red-soft:#FFE6E6;
+  --shadow:0 1px 2px rgba(14,27,26,.05),0 6px 24px rgba(14,27,26,.06);
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1211; --surface:#121B19; --surface2:#16211F; --ink:#E7F0ED; --muted:#8FA29E; --line:#23312E;
+    --accent:#2BD9A5; --accent-ink:#7CF0C9; --accent-soft:#123A2F; --suds:#1C4A3D;
+    --lilac:#A79BFF; --lilac-soft:#25213F; --amber:#F2B04B; --amber-soft:#3A2B12; --red:#FF7A7F; --red-soft:#3D1A1C;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 24px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1211; --surface:#121B19; --surface2:#16211F; --ink:#E7F0ED; --muted:#8FA29E; --line:#23312E;
+  --accent:#2BD9A5; --accent-ink:#7CF0C9; --accent-soft:#123A2F; --suds:#1C4A3D;
+  --lilac:#A79BFF; --lilac-soft:#25213F; --amber:#F2B04B; --amber-soft:#3A2B12; --red:#FF7A7F; --red-soft:#3D1A1C;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Bricolage Grotesque",sans-serif;margin:0;letter-spacing:-.02em}
+button,select,input,textarea{font:inherit;color:inherit}
+.mono{font-family:"JetBrains Mono",monospace;font-size:.86em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+.muted{color:var(--muted)}
+.hidden{display:none!important}
+
+/* Top bar */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:16px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-family:"Bricolage Grotesque";font-weight:800;font-size:22px;letter-spacing:-.03em}
+.logo svg{width:32px;height:32px}
+.steps{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font-size:13px;color:var(--muted);border:1px solid transparent}
+.step b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--line);font-size:12px;color:var(--muted)}
+.step.on{color:var(--ink);border-color:var(--line);background:var(--surface)}
+.step.on b{background:var(--accent);color:#04241B}
+.step.done b{background:var(--accent-soft);color:var(--accent-ink)}
+@media (max-width:720px){.step span{display:none}}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:10px 16px;border-radius:12px;cursor:pointer;font-weight:500;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.primary:hover{opacity:.9}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#04241B;font-weight:700}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:var(--surface)}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn svg{width:16px;height:16px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.pad{padding:22px}
+section.screen{padding:32px 0 64px}
+
+/* Upload hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;margin-bottom:28px}
+.hero h1{font-size:clamp(34px,5vw,56px);line-height:1.02;font-weight:800}
+.hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--suds) 62%);padding:0 4px}
+.hero p{font-size:17px;color:var(--muted);max-width:520px;margin:16px 0 0}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);margin-bottom:14px}
+.bubbles{position:relative;height:220px}
+.bubbles span{position:absolute;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.9),var(--suds) 45%,var(--accent) 140%);opacity:.75;animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@media (prefers-reduced-motion:reduce){.bubbles span{animation:none}}
+.bubbles .tag{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:12.5px;box-shadow:var(--shadow);font-family:"JetBrains Mono",monospace}
+.bubbles .tag s{color:var(--red);opacity:.8}
+.bubbles .tag i{font-style:normal;color:var(--accent-ink)}
+@media (max-width:820px){.hero{grid-template-columns:1fr}.bubbles{display:none}}
+
+.intake{display:grid;grid-template-columns:1.3fr 1fr;gap:18px}
+@media (max-width:820px){.intake{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:34px 20px;text-align:center;cursor:pointer;transition:.15s;background:var(--surface2)}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop svg{width:42px;height:42px;color:var(--accent)}
+.drop h3{font-size:20px;margin:8px 0 4px}
+textarea{width:100%;min-height:118px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface2);resize:vertical;font-family:"JetBrains Mono",monospace;font-size:12.5px}
+textarea:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.filelist{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.fchip{display:flex;align-items:center;gap:8px;padding:7px 8px 7px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--line);font-size:13.5px}
+.fchip button{border:0;background:none;cursor:pointer;color:var(--muted);padding:2px 6px;border-radius:6px}
+.fchip button:hover{background:var(--line);color:var(--ink)}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+select,input[type=search],input[type=text]{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px}
+.privacy{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted);margin-top:18px}
+.privacy svg{width:18px;height:18px;color:var(--accent);flex:none}
+
+/* Mapping */
+.mapgrid{display:grid;gap:18px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.tscroll{overflow-x:auto}
+.warn{padding:12px 14px;border-radius:12px;background:var(--amber-soft);color:var(--amber);font-size:13.5px}
+
+/* Results */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+@media (max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{padding:16px 18px}
+.stat .n{font-family:"Bricolage Grotesque";font-weight:800;font-size:32px;line-height:1.1;letter-spacing:-.03em}
+.stat .l{font-size:13px;color:var(--muted)}
+.stat .s{font-size:12px;color:var(--muted);margin-top:2px}
+.stat.hl{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.stat.hl .l,.stat.hl .s{color:color-mix(in srgb,var(--bg) 70%,transparent)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tab{border:0;background:none;padding:12px 14px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:var(--line);font-size:11.5px;font-weight:700;color:var(--muted)}
+.badge.alert{background:var(--lilac);color:#fff}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar input[type=search]{flex:1;min-width:200px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);margin:2px 4px 2px 0;white-space:nowrap}
+.chip.amber{background:var(--amber-soft);color:var(--amber);border-color:transparent}
+.chip.red{background:var(--red-soft);color:var(--red);border-color:transparent}
+.chip.lilac{background:var(--lilac-soft);color:var(--lilac);border-color:transparent}
+.chip.green{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.merged{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);padding:1px 7px;border-radius:999px;margin-left:6px}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 4px 0;font-size:13px;color:var(--muted)}
+.empty{text-align:center;padding:42px 20px;color:var(--muted)}
+.empty svg{width:40px;height:40px;color:var(--accent);margin-bottom:8px}
+
+/* Review */
+.rcard{margin-bottom:14px;overflow:hidden}
+.rhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)}
+.rhead h3{font-size:16px}
+.reasons{padding:12px 20px 0;margin:0;list-style:none}
+.reasons li{font-size:13.5px;padding:3px 0 3px 22px;position:relative}
+.reasons li:before{content:"";position:absolute;left:4px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--lilac)}
+.cmp td.lbl{color:var(--muted);font-size:12px;width:90px;white-space:nowrap}
+.cmp td.diff{background:var(--amber-soft)}
+.cmp th{text-transform:none;letter-spacing:0;font-size:12px}
+.choices{padding:4px 20px 8px;display:grid;gap:10px}
+.choice{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13.5px}
+.choice .fl{width:84px;color:var(--muted);font-size:12px}
+.choice label{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--surface2)}
+.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.choice input{accent-color:var(--accent);margin:0}
+.ractions{display:flex;gap:8px;padding:14px 20px;border-top:1px solid var(--line);background:var(--surface2);flex-wrap:wrap}
+.rdone{display:flex;align-items:center;gap:10px;padding:14px 20px;flex-wrap:wrap;font-size:14px}
+.rdone svg{width:20px;height:20px;color:var(--accent)}
+.sechead{display:flex;align-items:baseline;gap:10px;margin:8px 0 14px}
+.sechead h2{font-size:20px}
+.flagrow{display:grid;grid-template-columns:1.2fr 1.4fr auto;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}
+.flagrow:last-child{border-bottom:0}
+@media (max-width:720px){.flagrow{grid-template-columns:1fr}}
+
+/* Report */
+.report{padding:28px}
+.rep-top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:24px}
+.rep-top h2{font-size:28px}
+.flow{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin-bottom:26px}
+.flow .box{border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center;background:var(--surface2)}
+.flow .box.out{background:var(--accent-soft);border-color:transparent}
+.flow .box .n{font-family:"Bricolage Grotesque";font-weight:800;font-size:44px;line-height:1}
+.flow .arrow{font-size:28px;color:var(--accent)}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
+@media (max-width:820px){.rgrid{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.flow .arrow{transform:rotate(90deg);text-align:center}}
+.rbox{border:1px solid var(--line);border-radius:14px;padding:18px}
+.rbox h3{font-size:15px;margin-bottom:12px}
+.bar{display:grid;grid-template-columns:150px 1fr 40px;gap:10px;align-items:center;font-size:13px;margin:7px 0}
+.bar .t{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar .t i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.bar.amber .t i{background:var(--amber)}
+.bar.red .t i{background:var(--red)}
+.bar .v{text-align:right;font-weight:700}
+.before{color:var(--red);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--red) 50%,transparent)}
+.after{color:var(--accent-ink);font-weight:500}
+.footer{padding:24px 0 40px;text-align:center;font-size:12.5px;color:var(--muted)}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media print{
+  body{background:#fff;color:#000}
+  .top,.stats,.tabs,.no-print,.footer,.toast{display:none!important}
+  .panel{display:none!important}
+  #panel-report{display:block!important}
+  .card{box-shadow:none;border:0}
+  section.screen{padding:0}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="logo" aria-label="Scrubbr">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="17" r="10" fill="var(--accent)"/><circle cx="23" cy="9" r="6" fill="var(--suds)" stroke="var(--accent)" stroke-width="1.5"/><circle cx="25" cy="22" r="3.5" fill="var(--suds)" stroke="var(--accent)" stroke-width="1.5"/><circle cx="10" cy="13.5" r="2.6" fill="#fff" opacity=".85"/></svg>
+      Scrubbr
+    </div>
+    <nav class="steps" aria-label="Progress">
+      <div class="step" data-step="1"><b>1</b><span>Add leads</span></div>
+      <div class="step" data-step="2"><b>2</b><span>Map columns</span></div>
+      <div class="step" data-step="3"><b>3</b><span>Review &amp; export</span></div>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- STEP 1: UPLOAD -->
+<section class="screen" id="screen-upload">
+  <div class="hero">
+    <div>
+      <div class="pill">● Lead cleanup &amp; deduplication</div>
+      <h1>Messy leads in.<br><em>Clean leads out.</em></h1>
+      <p>Scrubbr fixes names, emails, phones and company names, merges duplicates, flags fake or incomplete records, and hands you a CRM-ready list plus a before-and-after report.</p>
+    </div>
+    <div class="bubbles" aria-hidden="true">
+      <span style="width:120px;height:120px;left:12%;top:30px"></span>
+      <span style="width:64px;height:64px;left:58%;top:4px;animation-delay:-2s"></span>
+      <span style="width:42px;height:42px;left:78%;top:120px;animation-delay:-4s"></span>
+      <span style="width:28px;height:28px;left:44%;top:168px;animation-delay:-1s"></span>
+      <div class="tag" style="left:34%;top:62px"><s>JOHN SMITH</s> → <i>John Smith</i></div>
+      <div class="tag" style="left:2%;top:150px"><s>415.555.0132</s> → <i>+1 (415) 555-0132</i></div>
+      <div class="tag" style="left:46%;top:118px"><s>gmial.com</s> → <i>gmail.com</i></div>
+    </div>
+  </div>
+
+  <div class="intake">
+    <div class="card pad">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload lead files">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <h3>Drop lead files here</h3>
+        <div class="muted">CSV, TSV or Excel — add as many files as you like</div>
+        <input type="file" id="fileInput" multiple accept=".csv,.tsv,.txt,.xlsx,.xls" class="hidden">
+      </div>
+      <div class="filelist" id="fileList"></div>
+      <div class="spread" style="margin-top:18px">
+        <button class="btn" id="sampleBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/></svg>
+          Try with messy sample data
+        </button>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px">Default phone country
+          <select id="country"><option value="US">United States (+1)</option><option value="PH">Philippines (+63)</option></select>
+        </label>
+      </div>
+    </div>
+    <div class="card pad">
+      <h3 style="font-size:17px;margin-bottom:4px">Paste leads</h3>
+      <div class="muted" style="font-size:13.5px;margin-bottom:10px">Copied rows from an email, Google Sheet or Excel. First row should be the column headers.</div>
+      <textarea id="pasteBox" placeholder="Name, Email, Phone, Company&#10;jane doe, Jane@Acme.com, 4155550101, ACME INC"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn sm" id="pasteBtn">Add pasted leads</button></div>
+    </div>
+  </div>
+
+  <div class="spread" style="margin-top:22px">
+    <div class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Everything runs in your browser. Your leads are never uploaded or stored anywhere.</div>
+    <button class="btn primary" id="toMapBtn" disabled>Continue to column mapping →</button>
+  </div>
+</section>
+
+<!-- STEP 2: MAPPING -->
+<section class="screen hidden" id="screen-map">
+  <div class="spread" style="margin-bottom:20px">
+    <div>
+      <h1 style="font-size:32px">Check your columns</h1>
+      <div class="muted">Scrubbr matched your headers automatically. Fix anything that looks off.</div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="backUpload">← Back</button>
+      <button class="btn accent" id="scrubBtn">Scrub leads ✦</button>
+    </div>
+  </div>
+  <div class="mapgrid" id="mapGrid"></div>
+</section>
+
+<!-- STEP 3: RESULTS -->
+<section class="screen hidden" id="screen-results">
+  <div class="spread no-print" style="margin-bottom:18px">
+    <div>
+      <h1 style="font-size:32px">Your leads, scrubbed</h1>
+      <div class="muted" id="resultSub"></div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="backMap">← Columns</button>
+      <button class="btn" id="restartBtn">Start over</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card pad no-print" style="margin-bottom:20px;padding:14px 18px">
+    <div class="spread">
+      <div class="row">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px">Export format
+          <select id="crmFormat"><option value="generic">Generic CSV</option><option value="hubspot">HubSpot import</option><option value="salesforce">Salesforce leads</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <button class="btn accent sm" id="dlClean">⬇ Clean leads CSV</button>
+        <button class="btn sm" id="dlReview">⬇ Needs review CSV</button>
+        <button class="btn sm" id="dlLog">⬇ Change log CSV</button>
+        <button class="btn sm" id="printBtn">⎙ Report PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs no-print" role="tablist">
+    <button class="tab" data-tab="report">Report</button>
+    <button class="tab" data-tab="clean">Clean leads <span class="badge" id="bClean">0</span></button>
+    <button class="tab" data-tab="review">Needs review <span class="badge" id="bReview">0</span></button>
+    <button class="tab" data-tab="log">Change log <span class="badge" id="bLog">0</span></button>
+  </div>
+
+  <div class="panel" id="panel-report"></div>
+  <div class="panel" id="panel-clean"></div>
+  <div class="panel" id="panel-review"></div>
+  <div class="panel" id="panel-log"></div>
+</section>
+</main>
+
+<div class="footer">Scrubbr · Built by Mia Marie Briones · MA System Solutions</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+
+<script id="engine">
+/* ================= SCRUBBR ENGINE (no DOM) ================= */
+const Scrub = (() => {
+  const FIELDS = [
+    {key:'firstName', label:'First name', syn:['first name','firstname','first','given name','fname','forename']},
+    {key:'lastName',  label:'Last name',  syn:['last name','lastname','surname','last','family name','lname']},
+    {key:'fullName',  label:'Full name',  syn:['full name','name','contact name','contact','lead name','customer name','person','client name']},
+    {key:'email',     label:'Email',      syn:['email','e-mail','email address','e-mail address','mail','work email','email id']},
+    {key:'phone',     label:'Phone',      syn:['phone','phone number','mobile','mobile number','cell','cell phone','tel','telephone','contact number','phone no','mobile no','work phone']},
+    {key:'company',   label:'Company',    syn:['company','company name','organization','organisation','business','business name','account','account name','employer','firm']},
+    {key:'title',     label:'Job title',  syn:['title','job title','position','role','designation','job']},
+    {key:'website',   label:'Website',    syn:['website','url','web','domain','site','web site','company website']},
+    {key:'city',      label:'City',       syn:['city','location','town','municipality']},
+    {key:'source',    label:'Lead source',syn:['source','lead source','channel','origin']},
+  ];
+  const FREE = new Set(['gmail.com','googlemail.com','yahoo.com','yahoo.com.ph','ymail.com','rocketmail.com','hotmail.com','outlook.com','live.com','msn.com','aol.com','icloud.com','me.com','mac.com','protonmail.com','proton.me','gmx.com','mail.com','zoho.com','yandex.com']);
+  const ROLE = new Set(['info','sales','admin','support','contact','hello','office','team','help','enquiries','inquiries','marketing','billing','hr','careers','jobs','service','mail','general']);
+  const FAKE_LOCAL = /^(test\d*|testing|asdf+|qwerty|abc|abc123|a+|x+|fake|none|na|noemail|nobody|sample|null|dummy|nomail|no|123+)$/;
+  const FAKE_DOMAIN = new Set(['example.com','example.org','test.com','test.net','fake.com','asdf.com','mailinator.com','domain.com','sample.com','noemail.com','none.com']);
+  const FAKE_NAME = /\b(test|asdf|qwerty|fake|dummy|sample|xxx|unknown)\b/i;
+  const DOMAIN_FIX = {'gmial.com':'gmail.com','gmai.com':'gmail.com','gmail.co':'gmail.com','gamil.com':'gmail.com','gnail.com':'gmail.com','gmaill.com':'gmail.com','yaho.com':'yahoo.com','yahooo.com':'yahoo.com','yhoo.com':'yahoo.com','hotmial.com':'hotmail.com','hotmai.com':'hotmail.com','hotmal.com':'hotmail.com','outlok.com':'outlook.com','outloo.com':'outlook.com','iclod.com':'icloud.com','icoud.com':'icloud.com'};
+  const NICK = [['john','jon','johnny','jack'],['michael','mike','mikey','mick'],['daniel','dan','danny'],['robert','rob','bob','bobby','bert'],['william','will','bill','billy','liam'],['james','jim','jimmy','jamie'],['christopher','chris','topher'],['joseph','joe','joey'],['thomas','tom','tommy'],['steven','stephen','steve'],['richard','rick','rich','dick'],['anthony','tony'],['matthew','matt'],['andrew','andy','drew'],['benjamin','ben','benji'],['nicholas','nick','nico'],['alexander','alex','xander'],['elizabeth','liz','beth','lizzy','eliza'],['katherine','catherine','kate','katie','kathy','cathy'],['jennifer','jen','jenny'],['patricia','pat','patty','trish'],['margaret','maggie','meg','peggy'],['rebecca','becky','becca'],['samantha','sam'],['samuel','sam','sammy'],['jessica','jess','jessie'],['victoria','vicky','tori'],['deborah','debbie','deb'],['susan','sue','susie'],['angela','angie'],['ramon','mon'],['francisco','frank','kiko'],['jose','pepe'],['edward','ed','eddie','ted']];
+  const NICKMAP = {}; NICK.forEach(g => g.forEach(n => { if (!NICKMAP[n]) NICKMAP[n] = g[0]; }));
+
+  const clean = s => (s == null ? '' : String(s)).replace(/[\u00A0\u2000-\u200B\uFEFF]/g, ' ').replace(/\s+/g, ' ').trim();
+  const normH = s => clean(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const letters = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
+
+  /* ---------- parsing ---------- */
+  function detectDelim(t) {
+    const first = (t.split(/\r?\n/)[0] || '');
+    const c = {',':0, '\t':0, ';':0, '|':0}; let q = false;
+    for (const ch of first) { if (ch === '"') q = !q; else if (!q && ch in c) c[ch]++; }
+    const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return best[1] > 0 ? best[0] : ',';
+  }
+  function parseCSV(text) {
+    text = String(text).replace(/^\uFEFF/, '');
+    const d = detectDelim(text), rows = []; let row = [], f = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+      else if (ch === '"' && f.trim() === '') { q = true; f = ''; }
+      else if (ch === d) { row.push(f); f = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+      else f += ch;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows.filter(r => r.some(c => clean(c) !== ''));
+  }
+  function rowsToTable(rows) {
+    if (!rows.length) return {headers: [], rows: []};
+    const seen = {};
+    const headers = rows[0].map((h, i) => { let n = clean(h) || `Column ${i + 1}`; if (seen[n]) n = `${n} (${++seen[n]})`; else seen[n] = 1; return n; });
+    const out = rows.slice(1).map(r => { const o = {}; headers.forEach((h, i) => o[h] = r[i] == null ? '' : String(r[i])); return o; });
+    return {headers, rows: out};
+  }
+  function detectMapping(headers) {
+    const map = {}, used = new Set();
+    headers.forEach(h => map[h] = '');
+    headers.forEach(h => { const n = normH(h); const f = FIELDS.find(f => !used.has(f.key) && f.syn.some(s => normH(s) === n)); if (f) { map[h] = f.key; used.add(f.key); } });
+    headers.forEach(h => {
+      if (map[h]) return; const n = normH(h); if (!n) return;
+      const f = FIELDS.find(f => !used.has(f.key) && f.syn.some(s => { const sn = normH(s); return sn.length >= 4 && n.includes(sn); }));
+      if (f) { map[h] = f.key; used.add(f.key); }
+    });
+    if ((used.has('firstName') || used.has('lastName')) && used.has('fullName')) {
+      const h = headers.find(h => map[h] === 'fullName'); if (h) map[h] = '';
+    }
+    return map;
+  }
+
+  /* ---------- cleaners ---------- */
+  const cap = p => {
+    if (!p) return p;
+    if (p.length > 3 && p.startsWith('mc')) return 'Mc' + p[2].toUpperCase() + p.slice(3);
+    return p.charAt(0).toUpperCase() + p.slice(1);
+  };
+  const capWord = lw => lw.split('-').map(part => part.split("'").map(cap).join("'")).join('-');
+  function caseNameWord(w) {
+    if (!w) return w;
+    const lower = w === w.toLowerCase(), upper = w === w.toUpperCase();
+    const lw = w.toLowerCase(), bare = lw.replace(/\./g, '');
+    if (['ii', 'iii', 'iv', 'vi'].includes(bare)) return bare.toUpperCase();
+    if (bare === 'jr' || bare === 'sr') return cap(bare) + '.';
+    if (!(lower || upper)) return w;
+    return capWord(lw);
+  }
+  function stripName(s) {
+    return clean(s).replace(/’/g, "'").replace(/^(mr|mrs|ms|miss|dr|engr|atty|prof)\.?\s+/i, '')
+      .replace(/[^\p{L}\p{M}'.\- ,]/gu, '').replace(/\s+/g, ' ').trim();
+  }
+  const caseName = s => s.split(' ').filter(Boolean).map(caseNameWord).join(' ');
+  function splitName(s) {
+    if (s.includes(',')) {
+      const i = s.indexOf(','); const last = s.slice(0, i).trim(), first = s.slice(i + 1).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+      return [first, last];
+    }
+    const t = s.split(' ').filter(Boolean);
+    if (t.length <= 1) return [t[0] || '', ''];
+    return [t[0], t.slice(1).join(' ')];
+  }
+  function cleanEmail(s) {
+    let e = clean(s).toLowerCase().replace(/^mailto:/, '');
+    if ((e.match(/@/g) || []).length > 1) e = (e.split(/[;,\s]+/).find(x => x.includes('@')) || e);
+    e = e.replace(/[<>"'()\[\]]/g, '').replace(/\s+/g, '').replace(/,/g, '.').replace(/\.{2,}/g, '.').replace(/^\.+|\.+$/g, '');
+    const at = e.lastIndexOf('@');
+    if (at > 0) {
+      const local = e.slice(0, at); let dom = e.slice(at + 1);
+      dom = dom.replace(/\.(con|cmo|ocm|comm|vom|cm)$/, '.com');
+      if (DOMAIN_FIX[dom]) dom = DOMAIN_FIX[dom];
+      e = local + '@' + dom;
+    }
+    return e;
+  }
+  function emailInfo(e) {
+    if (!e) return {status: '', free: false, role: false, domain: ''};
+    const at = e.lastIndexOf('@'); const local = at > 0 ? e.slice(0, at) : e, domain = at > 0 ? e.slice(at + 1) : '';
+    const valid = /^[a-z0-9._%+'-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(e);
+    let status = valid ? 'valid' : 'invalid';
+    if (FAKE_LOCAL.test(local) || FAKE_DOMAIN.has(domain)) status = 'suspicious';
+    return {status, free: FREE.has(domain), role: ROLE.has(local), domain};
+  }
+  function isSuspiciousDigits(d) {
+    if (d.length < 7) return false;
+    if (/^(\d)\1+$/.test(d.slice(-7))) return true;
+    return '01234567890'.includes(d) || '9876543210'.includes(d) || '1234567890'.includes(d.slice(-10));
+  }
+  function cleanPhone(raw, country) {
+    let s = clean(raw);
+    if (!s) return {value: '', key: '', status: ''};
+    let ext = '';
+    const m = s.match(/\s*(?:ext\.?|extension|x|#)\s*(\d{1,6})\s*$/i);
+    if (m) { ext = m[1]; s = s.slice(0, m.index); }
+    const plus = /^\s*(\+|00)/.test(s);
+    let d = s.replace(/\D/g, '');
+    if (/^\s*00/.test(s)) d = d.slice(2);
+    const bad = st => ({value: clean(raw), key: '', status: st});
+    if (!d) return bad('invalid');
+    if (isSuspiciousDigits(d)) return bad('suspicious');
+    let cc = '', nat = '';
+    if (plus) {
+      if (d.startsWith('1') && d.length === 11) { cc = '1'; nat = d.slice(1); }
+      else if (d.startsWith('63')) { cc = '63'; nat = d.slice(2); if (nat.startsWith('0')) nat = nat.slice(1); }
+      else return (d.length >= 8 && d.length <= 15) ? {value: '+' + d + (ext ? ' ext. ' + ext : ''), key: '+' + d, status: 'valid'} : bad('invalid');
+    } else {
+      if (d.length === 11 && d.startsWith('09')) { cc = '63'; nat = d.slice(1); }
+      else if (d.length === 12 && d.startsWith('639')) { cc = '63'; nat = d.slice(2); }
+      else if (d.length === 11 && d.startsWith('1')) { cc = '1'; nat = d.slice(1); }
+      else if (d.length === 10) {
+        if (country === 'PH' && d.startsWith('9')) { cc = '63'; nat = d; }
+        else if (country === 'PH' && d.startsWith('0')) { cc = '63'; nat = d.slice(1); }
+        else { cc = '1'; nat = d; }
+      }
+      else if (country === 'PH' && d.startsWith('0') && d.length >= 9 && d.length <= 11) { cc = '63'; nat = d.slice(1); }
+      else return bad('invalid');
+    }
+    let value = '';
+    if (cc === '1') {
+      if (!/^[2-9]\d{2}[2-9]\d{6}$/.test(nat)) return bad('invalid');
+      value = `+1 (${nat.slice(0, 3)}) ${nat.slice(3, 6)}-${nat.slice(6)}`;
+    } else {
+      if (nat.length === 10 && nat.startsWith('9')) value = `+63 ${nat.slice(0, 3)} ${nat.slice(3, 6)} ${nat.slice(6)}`;
+      else if (nat.length === 9 && nat.startsWith('2')) value = `+63 2 ${nat.slice(1, 5)} ${nat.slice(5)}`;
+      else if (nat.length === 9 && /^[3-8]/.test(nat)) value = `+63 ${nat.slice(0, 2)} ${nat.slice(2, 5)} ${nat.slice(5)}`;
+      else if (nat.length === 8 && /^[3-8]/.test(nat)) value = `+63 ${nat.slice(0, 2)} ${nat.slice(2, 5)} ${nat.slice(5)}`;
+      else return bad('invalid');
+    }
+    return {value: value + (ext ? ' ext. ' + ext : ''), key: '+' + cc + nat, status: 'valid'};
+  }
+  const SUFFIX = [[/^(inc|inc\.|incorporated)$/i, 'Inc.'], [/^(llc|l\.l\.c\.?)$/i, 'LLC'], [/^(corp|corp\.|corporation)$/i, 'Corp.'], [/^(ltd|ltd\.|limited)$/i, 'Ltd.'], [/^(co|co\.)$/i, 'Co.'], [/^llp\.?$/i, 'LLP'], [/^plc\.?$/i, 'PLC']];
+  const SMALL = ['and', 'of', 'the', 'for', 'de', 'la', 'del', 'at', 'in', 'on', 'to'];
+  function casePhrase(c, keepShortUpper) {
+    const wholeUpper = c === c.toUpperCase() && /[A-Z]/.test(c), wholeLower = c === c.toLowerCase() && /[a-z]/.test(c);
+    if (!(wholeUpper || wholeLower)) return c;
+    return c.split(' ').map((w, i) => {
+      if (keepShortUpper && wholeUpper && w.replace(/[^A-Za-z]/g, '').length <= 3 && !['AND', 'THE', 'OF', 'FOR'].includes(w)) return w;
+      const lw = w.toLowerCase();
+      if (i > 0 && SMALL.includes(lw)) return lw;
+      return capWord(lw);
+    }).join(' ');
+  }
+  function cleanCompany(s) {
+    let c = clean(s); if (!c) return '';
+    c = c.replace(/\s*,\s*(?=(inc|llc|corp|corporation|ltd|co|llp|plc|incorporated|limited)\b\.?)/i, ' ');
+    c = casePhrase(c, true);
+    return c.split(' ').map((w, i) => { if (i > 0) for (const [re, rep] of SUFFIX) if (re.test(w)) return rep; return w; }).join(' ').trim();
+  }
+  const CO_STOP = new Set(['inc', 'incorporated', 'llc', 'corp', 'corporation', 'ltd', 'limited', 'co', 'company', 'llp', 'plc', 'pty', 'the']);
+  const companyKey = c => c ? c.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w && !CO_STOP.has(w)).join('') : '';
+  const TITLE_ABBR = {mgr: 'Manager', mngr: 'Manager', ops: 'Operations', dir: 'Director', asst: 'Assistant', sr: 'Senior', jr: 'Junior', exec: 'Executive', coord: 'Coordinator', rep: 'Representative', eng: 'Engineer', engr: 'Engineer', admin: 'Administrator', acct: 'Account', dept: 'Department'};
+  const TITLE_UP = new Set(['ceo', 'cfo', 'coo', 'cto', 'cmo', 'cio', 'vp', 'svp', 'evp', 'it', 'hr', 'gm', 'hvac', 'pr', 'qa', 'ar', 'ap', 'cpa', 'ui', 'ux']);
+  function cleanTitle(s) {
+    const c = casePhrase(clean(s), true); if (!c) return '';
+    return c.split(' ').map(w => { const lw = w.toLowerCase().replace(/\.$/, ''); if (TITLE_ABBR[lw]) return TITLE_ABBR[lw]; if (TITLE_UP.has(lw)) return lw.toUpperCase(); return w; }).join(' ');
+  }
+  function cleanWebsite(s) {
+    let w = clean(s).toLowerCase(); if (!w) return '';
+    w = w.replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[\/?#]/)[0];
+    return w;
+  }
+
+  /* ---------- record ---------- */
+  function cleanRecord(row, mapping, file, country, id) {
+    const o = {};
+    for (const [h, f] of Object.entries(mapping)) { if (!f) continue; const v = clean(row[h]); if (v && !o[f]) o[f] = v; }
+    const r = {id, file, orig: o, changes: []};
+    const ch = (field, before, after) => { if (before && before !== after) r.changes.push({field, before, after}); };
+    let first = '', last = '', origName = '';
+    if (o.firstName || o.lastName) {
+      origName = [o.firstName, o.lastName].filter(Boolean).join(' ');
+      first = caseName(stripName(o.firstName || '').replace(/,/g, ''));
+      last = caseName(stripName(o.lastName || '').replace(/,/g, ''));
+      if (!last && first.includes(' ')) [first, last] = splitName(first);
+    } else if (o.fullName) {
+      origName = o.fullName;
+      [first, last] = splitName(caseName(stripName(o.fullName)));
+    }
+    r.firstName = first; r.lastName = last;
+    r.fullName = [first, last].filter(Boolean).join(' ');
+    r.hasName = !!r.fullName;
+    r.firstKey = letters(first); r.lastKey = letters(last);
+    r.nameKey = (r.firstKey + ' ' + r.lastKey).trim();
+    ch('Name', origName, r.fullName);
+
+    r.email = o.email ? cleanEmail(o.email) : '';
+    const ei = emailInfo(r.email);
+    r.emailStatus = ei.status; r.emailFree = ei.free; r.emailRole = ei.role;
+    ch('Email', o.email, r.email);
+
+    const p = cleanPhone(o.phone, country);
+    r.phone = p.value; r.phoneKey = p.key; r.phoneStatus = p.status;
+    ch('Phone', o.phone, r.phone);
+
+    r.company = cleanCompany(o.company); r.companyKey = companyKey(r.company);
+    ch('Company', o.company, r.company);
+    r.title = cleanTitle(o.title); ch('Title', o.title, r.title);
+    r.website = cleanWebsite(o.website); ch('Website', o.website, r.website);
+    r.city = casePhrase(clean(o.city), false); ch('City', o.city, r.city);
+    r.source = o.source ? casePhrase(clean(o.source), false) : file;
+
+    r.domain = r.website || (ei.status === 'valid' && !ei.free ? ei.domain : '');
+    r.nameSuspicious = FAKE_NAME.test(r.fullName) || FAKE_NAME.test(r.company);
+    r.completeness = ['fullName', 'email', 'phone', 'company', 'title', 'website', 'city'].filter(k => r[k]).length;
+    return r;
+  }
+
+  /* ---------- similarity ---------- */
+  function jaro(a, b) {
+    if (a === b) return 1;
+    const la = a.length, lb = b.length; if (!la || !lb) return 0;
+    const md = Math.max(0, Math.floor(Math.max(la, lb) / 2) - 1);
+    const am = new Array(la).fill(false), bm = new Array(lb).fill(false); let m = 0;
+    for (let i = 0; i < la; i++) {
+      const s = Math.max(0, i - md), e = Math.min(i + md + 1, lb);
+      for (let j = s; j < e; j++) { if (bm[j] || a[i] !== b[j]) continue; am[i] = bm[j] = true; m++; break; }
+    }
+    if (!m) return 0;
+    let t = 0, k = 0;
+    for (let i = 0; i < la; i++) { if (!am[i]) continue; while (!bm[k]) k++; if (a[i] !== b[k]) t++; k++; }
+    t /= 2;
+    return (m / la + m / lb + (m - t) / m) / 3;
+  }
+  function jw(a, b) { const j = jaro(a, b); let p = 0; while (p < 4 && p < a.length && p < b.length && a[p] === b[p]) p++; return j + p * 0.1 * (1 - j); }
+  const canon = f => NICKMAP[f] || f;
+  function nameSim(A, B) {
+    if (!A.hasName || !B.hasName) return 0;
+    let s = jw(A.nameKey, B.nameKey);
+    if (A.lastKey && A.lastKey === B.lastKey && A.firstKey && B.firstKey) {
+      if (canon(A.firstKey) === canon(B.firstKey)) s = Math.max(s, 0.96);
+      else if ((A.firstKey.length === 1 || B.firstKey.length === 1) && A.firstKey[0] === B.firstKey[0]) s = Math.max(s, 0.9);
+      else if (jw(A.firstKey, B.firstKey) < 0.85) s = Math.min(s, 0.8); // same surname, clearly different first names
+    }
+    return s;
+  }
+
+  class UF {
+    constructor(n) { this.p = Array.from({length: n}, (_, i) => i); }
+    find(x) { while (this.p[x] !== x) { this.p[x] = this.p[this.p[x]]; x = this.p[x]; } return x; }
+    union(a, b) { a = this.find(a); b = this.find(b); if (a !== b) this.p[Math.max(a, b)] = Math.min(a, b); }
+  }
+
+  const PICK = {
+    name: r => r.hasName ? r.nameKey : '',
+    email: r => r.email,
+    phone: r => r.phoneKey || r.phone,
+    company: r => r.companyKey,
+    title: r => r.title.toLowerCase(),
+    website: r => r.website,
+    city: r => r.city.toLowerCase(),
+  };
+  const FIELD_LABEL = {name: 'Name', email: 'Email', phone: 'Phone', company: 'Company', title: 'Job title', website: 'Website', city: 'City'};
+  function valid(r, f) { return f === 'email' ? r.emailStatus === 'valid' : f === 'phone' ? r.phoneStatus === 'valid' : true; }
+  function options(recs, ids, f) {
+    const by = new Map();
+    ids.forEach(id => { const r = recs[id], k = PICK[f](r); if (!k) return; if (!by.has(k)) by.set(k, []); by.get(k).push(r); });
+    return [...by.entries()].map(([k, list]) => {
+      list.sort((a, b) => b.completeness - a.completeness || a.id - b.id);
+      return {key: k, rec: list[0], count: list.length, valid: valid(list[0], f) ? 1 : 0,
+        len: f === 'name' ? list[0].fullName.length : 0};
+    }).sort((a, b) => b.valid - a.valid || b.count - a.count || b.len - a.len || b.rec.completeness - a.rec.completeness || a.rec.id - b.rec.id);
+  }
+  function diffFields(recs, ids) { return Object.keys(PICK).filter(f => options(recs, ids, f).length > 1); }
+  function conflictFields(recs, ids) {
+    const out = [];
+    const emails = new Set(ids.map(i => recs[i]).filter(r => r.emailStatus === 'valid').map(r => r.email));
+    if (emails.size > 1) out.push('email');
+    const phones = new Set(ids.map(i => recs[i]).filter(r => r.phoneStatus === 'valid').map(r => r.phoneKey));
+    if (phones.size > 1) out.push('phone');
+    const cos = [...new Set(ids.map(i => recs[i].companyKey).filter(Boolean))];
+    let coConflict = false;
+    for (let i = 0; i < cos.length; i++) for (let j = i + 1; j < cos.length; j++) {
+      const a = cos[i], b = cos[j];
+      if (!(a.includes(b) || b.includes(a)) && jw(a, b) < 0.9) coConflict = true;
+    }
+    if (coConflict) out.push('company');
+    return out;
+  }
+
+  /* ---------- dedupe analysis ---------- */
+  function analyze(recs) {
+    const n = recs.length, uf = new UF(n), blocks = new Map();
+    const add = (k, i) => { let a = blocks.get(k); if (!a) { a = []; blocks.set(k, a); } a.push(i); };
+    recs.forEach((r, i) => {
+      if (r.emailStatus === 'valid') add('e:' + r.email, i);
+      if (r.phoneStatus === 'valid') add('p:' + r.phoneKey, i);
+      if (r.domain) add('d:' + r.domain, i);
+      if (r.companyKey) add('c:' + r.companyKey.slice(0, 5), i);
+      if (r.lastKey) add('l:' + r.lastKey, i);
+      if (r.nameKey) add('n:' + r.nameKey.replace(/ /g, '').slice(0, 4), i);
+    });
+    const seen = new Set(), cand = [];
+    for (const [k, arr] of blocks) {
+      if (arr.length < 2) continue;
+      if (arr.length > 500 && !/^[ep]:/.test(k)) continue;
+      for (let x = 0; x < arr.length; x++) for (let y = x + 1; y < arr.length; y++) {
+        const a = arr[x], b = arr[y], key = a * n + b;
+        if (seen.has(key)) continue; seen.add(key); cand.push([a, b]);
+      }
+    }
+    const reviewPairs = [];
+    for (const [a, b] of cand) {
+      const A = recs[a], B = recs[b];
+      const ns = nameSim(A, B);
+      const sameEmail = A.emailStatus === 'valid' && A.email === B.email;
+      const samePhone = A.phoneStatus === 'valid' && B.phoneStatus === 'valid' && A.phoneKey === B.phoneKey;
+      const sameCo = A.companyKey && A.companyKey === B.companyKey;
+      if (sameEmail) { uf.union(a, b); continue; }
+      if (samePhone && (ns >= 0.85 || !A.hasName || !B.hasName)) { uf.union(a, b); continue; }
+      if (A.hasName && B.hasName && A.nameKey === B.nameKey && sameCo) { uf.union(a, b); continue; }
+      const cs = (A.companyKey && B.companyKey) ? jw(A.companyKey, B.companyKey) : 0;
+      const sameDomain = A.domain && A.domain === B.domain;
+      let reason = null, score = 0;
+      if (samePhone) { reason = 'Same phone number but different names — could be a shared office line'; score = 0.6; }
+      else if (ns >= 0.85 && cs >= 0.85) {
+        reason = sameCo ? 'Similar names at the same company, but different email and phone'
+          : `Similar names at similar companies (“${A.company}” vs “${B.company}”) — could be different businesses`;
+        score = (ns + cs) / 2;
+      }
+      else if (ns >= 0.9 && sameDomain) { reason = 'Similar names on the same company email domain'; score = ns; }
+      if (reason) reviewPairs.push({a, b, reason, score});
+    }
+    const byRoot = new Map();
+    for (let i = 0; i < n; i++) { const r = uf.find(i); if (!byRoot.has(r)) byRoot.set(r, []); byRoot.get(r).push(i); }
+    const groups = [...byRoot.values()].map(ids => ({ids}));
+    const gOf = new Array(n); groups.forEach((g, gi) => g.ids.forEach(id => gOf[id] = gi));
+    const rp = reviewPairs.filter(p => gOf[p.a] !== gOf[p.b]);
+    const guf = new UF(groups.length);
+    rp.forEach(p => guf.union(gOf[p.a], gOf[p.b]));
+    const comps = new Map();
+    rp.forEach(p => {
+      const c = guf.find(gOf[p.a]);
+      if (!comps.has(c)) comps.set(c, {gs: new Set(), pairs: []});
+      const o = comps.get(c); o.gs.add(gOf[p.a]); o.gs.add(gOf[p.b]); o.pairs.push(p);
+    });
+    const items = [], inItem = new Set();
+    for (const o of comps.values()) {
+      const gs = [...o.gs].sort((a, b) => a - b); gs.forEach(g => inItem.add(g));
+      const ids = gs.flatMap(g => groups[g].ids);
+      items.push({id: 'd' + items.length, type: 'duplicate', groups: gs, ids,
+        reasons: [...new Set(o.pairs.map(p => p.reason))], score: Math.max(...o.pairs.map(p => p.score)),
+        fields: diffFields(recs, ids)});
+    }
+    groups.forEach((g, gi) => {
+      if (g.ids.length < 2 || inItem.has(gi)) return;
+      const cf = conflictFields(recs, g.ids);
+      if (cf.length) items.push({id: 'c' + items.length, type: 'conflict', groups: [gi], ids: g.ids,
+        reasons: [`Matched automatically (same email or phone), but the records disagree on ${cf.join(' and ')}`],
+        score: 0.95, fields: diffFields(recs, g.ids)});
+    });
+    return {groups, items};
+  }
+
+  /* ---------- final build ---------- */
+  function issues(m) {
+    const b = [], w = [];
+    const emailOK = m.emailStatus === 'valid', phoneOK = m.phoneStatus === 'valid';
+    const fake = m.emailStatus === 'suspicious' || m.phoneStatus === 'suspicious' || m.nameSuspicious;
+    if (fake) b.push('Looks like test or fake data');
+    if (!m.email && !m.phone) b.push('No email or phone');
+    else if (!emailOK && !phoneOK && !fake) b.push('No usable email or phone');
+    if (!m.hasName && !m.company) b.push('Missing name and company');
+    if (m.email && m.emailStatus === 'invalid' && phoneOK) w.push('Invalid email');
+    if (m.phone && m.phoneStatus === 'invalid' && emailOK) w.push('Invalid phone');
+    if (emailOK && m.emailFree) w.push('Personal email domain');
+    if (emailOK && m.emailRole) w.push('Generic inbox');
+    if (!m.hasName && m.company) w.push('Missing contact name');
+    if (m.hasName && !m.company) w.push('Missing company');
+    return {blocking: b, warnings: w};
+  }
+  function buildMaster(recs, ids, choices) {
+    choices = choices || {};
+    const pick = f => {
+      if (choices[f] != null && ids.includes(choices[f])) return recs[choices[f]];
+      const o = options(recs, ids, f); return o.length ? o[0].rec : null;
+    };
+    const nr = pick('name'), er = pick('email'), pr = pick('phone'), cr = pick('company'), tr = pick('title'), wr = pick('website'), cir = pick('city');
+    const m = {
+      key: ids.slice().sort((a, b) => a - b).join('-'), ids: ids.slice(),
+      firstName: nr ? nr.firstName : '', lastName: nr ? nr.lastName : '', fullName: nr ? nr.fullName : '', hasName: !!nr,
+      email: er ? er.email : '', emailStatus: er ? er.emailStatus : '', emailFree: er ? er.emailFree : false, emailRole: er ? er.emailRole : false,
+      phone: pr ? pr.phone : '', phoneStatus: pr ? pr.phoneStatus : '',
+      company: cr ? cr.company : '', title: tr ? tr.title : '', website: wr ? wr.website : '', city: cir ? cir.city : '',
+      sources: [...new Set(ids.map(i => recs[i].source))],
+      nameSuspicious: ids.some(i => recs[i].nameSuspicious) && (!!nr && nr.nameSuspicious || !!cr && cr.nameSuspicious),
+    };
+    const is = issues(m); m.blocking = is.blocking; m.warnings = is.warnings;
+    return m;
+  }
+  function build(recs, an, dec, fdec) {
+    const {groups, items} = an;
+    const units = [], gUnit = new Array(groups.length);
+    const split = new Set(items.filter(it => it.type === 'conflict' && dec[it.id] && dec[it.id].action === 'separate').map(it => it.groups[0]));
+    groups.forEach((g, gi) => {
+      if (split.has(gi)) { gUnit[gi] = -1; g.ids.forEach(id => units.push({ids: [id], auto: false})); }
+      else { gUnit[gi] = units.length; units.push({ids: g.ids.slice(), auto: g.ids.length > 1}); }
+    });
+    const uuf = new UF(units.length), pending = new Set(), unitItem = new Map();
+    let reviewRemoved = 0;
+    for (const it of items) {
+      const d = dec[it.id]; const us = it.groups.map(g => gUnit[g]).filter(u => u >= 0);
+      us.forEach(u => unitItem.set(u, it));
+      if (!d) { us.forEach(u => pending.add(u)); continue; }
+      if (it.type === 'duplicate' && d.action === 'merge') { us.forEach(u => uuf.union(us[0], u)); reviewRemoved += us.length - 1; }
+    }
+    const clusters = new Map();
+    units.forEach((u, ui) => {
+      const r = uuf.find(ui);
+      if (!clusters.has(r)) clusters.set(r, {ids: [], pending: false, item: null});
+      const c = clusters.get(r); c.ids.push(...u.ids); if (pending.has(ui)) c.pending = true; if (unitItem.has(ui)) c.item = unitItem.get(ui);
+    });
+    const masters = [], pendingClusters = [];
+    let dupRemoved = 0;
+    for (const c of clusters.values()) {
+      if (c.pending) { pendingClusters.push(c); continue; }
+      const d = c.item && dec[c.item.id];
+      const choices = d && d.action === 'merge' ? d.fields : null;
+      const m = buildMaster(recs, c.ids, choices);
+      dupRemoved += c.ids.length - 1;
+      masters.push(m);
+    }
+    const clean = [], held = [], excluded = [];
+    masters.forEach(m => {
+      const fd = fdec[m.key];
+      if (m.blocking.length && fd === 'exclude') excluded.push(m);
+      else if (m.blocking.length && fd !== 'approve') held.push(m);
+      else clean.push(m);
+    });
+    clean.sort((a, b) => (a.lastName || a.company).localeCompare(b.lastName || b.company));
+    const changes = [];
+    recs.forEach(r => r.changes.forEach(c => changes.push({id: r.id, file: r.file, name: r.fullName || r.email || r.company || '(blank)', ...c})));
+    const byField = {}; changes.forEach(c => byField[c.field] = (byField[c.field] || 0) + 1);
+    const byIssue = {}; masters.forEach(m => [...m.blocking, ...m.warnings].forEach(x => byIssue[x] = (byIssue[x] || 0) + 1));
+    const byFile = {}; recs.forEach(r => byFile[r.file] = (byFile[r.file] || 0) + 1);
+    const pendingItems = items.filter(it => !dec[it.id]).length;
+    const heldUndecided = held.length;
+    return {masters, clean, held, excluded, pendingClusters, changes,
+      stats: {recordsIn: recs.length, files: Object.keys(byFile).length, byFile, dupRemoved, reviewRemoved, autoRemoved: dupRemoved - reviewRemoved,
+        fieldsCorrected: changes.length, byField, byIssue, pendingItems, heldUndecided, needsReview: pendingItems + heldUndecided,
+        clean: clean.length, excluded: excluded.length, warned: clean.filter(m => m.warnings.length).length,
+        recordsCorrected: recs.filter(r => r.changes.length).length}};
+  }
+
+  /* ---------- sample data ---------- */
+  function sampleFiles() {
+    const mk = (name, headers, rows) => ({name, headers, rows: rows.map(r => { const o = {}; headers.forEach((h, i) => o[h] = r[i] || ''); return o; })});
+    return [
+      mk('website_form_export.csv', ['First Name', 'Last Name', 'Email Address', 'Phone Number', 'Company', 'Job Title', 'Website'], [
+        ['John', 'Smith', 'john.smith@brightpathsolar.com', '(415) 555-0132', 'BrightPath Solar Inc', 'Operations Manager', 'https://www.brightpathsolar.com/'],
+        ['maria', 'santos', 'maria.santos@harborlogistics.com', '312-555-0177', 'Harbor Logistics LLC', 'Procurement Lead', ''],
+        ['David', 'Chen', 'dchen@novabuild.co', '646.555.0190', 'NovaBuild Co.', 'Project Director', 'novabuild.co'],
+        ['Aisha', 'Rahman', 'aisha@greenleafcafe.com', '2125550143', 'Greenleaf Cafe', 'Owner', 'greenleafcafe.com'],
+        ['Michael', "O'Brien", 'mobrien@summitroofing.com', '+1 720 555 0111', 'Summit Roofing Corp', 'Estimator', 'summitroofing.com'],
+        ['SARAH', 'MCDONALD', 'Sarah@McDonaldLaw.com', '(503) 555-0198', 'McDonald Law Group', 'Partner', ''],
+        ['Carlos', 'Rivera', 'carlos.rivera@sunvalleyhvac.com', '602-555-0164', 'Sun Valley HVAC', 'Service Manager', 'sunvalleyhvac.com'],
+        ['Emily', 'Johnson', 'emily.j@peakdental.com', '404-555-0129', 'Peak Dental Studio', 'Office Manager', ''],
+        ['Kevin', 'Patel', 'kevin@patelrealty.com', '713-555-0156', 'Patel Realty Group', 'Broker', 'patelrealty.com'],
+        ['Jasmine', 'Lee', 'jlee@bloomflorals.com', '206-555-0182', 'Bloom Florals', 'Founder', 'bloomflorals.com'],
+        ['Brian', 'Kim', 'brian.kim@acmesolar.com', '619-555-0135', 'Acme Solar', 'Sales Director', 'acmesolar.com'],
+        ['Rachel', 'Green', 'rachel@lumenstudio.com', '917-555-0150', 'Lumen Studio', 'Creative Director', ''],
+        ['Mark', 'Davis', 'info@davisplumbing.com', '512-555-0186', 'Davis Plumbing', 'Owner', 'davisplumbing.com'],
+        ['Olivia', 'Martinez', 'olivia.martinez@gmail.com', '480-555-0124', 'Martinez Events', 'Event Planner', ''],
+        ['Test', 'User', 'test@test.com', '555-555-5555', 'Test Company', '', ''],
+        ['Paul', 'Stone', 'paul.stone@gmial.com', '(469) 555-0103', 'Stone Masonry', 'Owner', ''],
+        ['', '', 'contact@sunrisebakery.com', '(626) 555-0177', 'Sunrise Bakery', '', ''],
+        ['Chris', 'Evans', 'chris@evansmedia.io', '555-0199', 'Evans Media', 'Producer', 'evansmedia.io'],
+        ['Grace', 'Tan', 'grace.tan@orchidhotels.com', '702-555-0108', 'Orchid Hotels', 'Sales Manager', 'orchidhotels.com'],
+        ['Patricia', 'Moore', 'pmoore@moorecpa.com', '919-555-0138', 'Moore CPA Firm', 'Partner', 'moorecpa.com'],
+      ]),
+      mk('tradeshow_signups.csv', ['Full Name', 'E-mail', 'Mobile', 'Organization', 'Position', 'City'], [
+        ['JOHN SMITH', ' John.Smith@BrightPathSolar.com ', '415.555.0132', 'BRIGHTPATH SOLAR, INC.', 'OPERATIONS MANAGER', 'San Francisco'],
+        ['Jon Smith', 'jsmith@brightpathsolar.com', '415-555-0199', 'BrightPath Solar Inc.', 'Field Technician', 'San Francisco'],
+        ['maria santos', 'MARIA.SANTOS@HARBORLOGISTICS.COM', '312 555 0100', 'harbor logistics, llc', 'procurement lead', 'chicago'],
+        ['Aisha Rahman', 'aisha@greenleafcafe,com', '212-555-0143', 'GREENLEAF CAFE', 'owner', 'New York'],
+        ['Carlos  Rivera', 'carlos.rivera@sunvalleyhvac.con', '(602) 555-0164', 'Sun Valley HVAC', 'Service Manager', 'Phoenix'],
+        ['Emily Johnson', 'emily.j@peakdental.com', '404-555-0129 ext 12', 'Peak Dental Studio', 'Office Mgr', 'Atlanta'],
+        ['Ramon Dela Cruz', 'ramon.delacruz@islandtech.ph', '0917 123 4567', 'IslandTech Solutions Inc.', 'IT Manager', 'Cebu City'],
+        ['angela reyes', 'angela.reyes@visayasfoods.com', '09281234567', 'Visayas Foods Corp.', 'Purchasing Head', 'Bacolod'],
+        ['Bryan Kim', 'bkim@acmesolarph.com', '+63 2 8555 0102', 'Acme Solar PH', 'Regional Sales Director', 'Manila'],
+        ['R. Green', 'rachel@lumenstudio.com', '(917) 555-0150', 'Lumen Studio', 'Creative Director', 'New York'],
+        ['Laura Davis', 'laura@davisplumbing.com', '512.555.0186', 'Davis Plumbing', 'Office Manager', 'Austin'],
+        ['Megan Ross', 'megan.ross@yaho.com', '(214) 555-0145', 'Ross Interiors', 'Designer', 'Dallas'],
+        ['Jennifer Lopez', '', '', 'JL Designs', 'Owner', 'Los Angeles'],
+        ['asdf', 'asdf@asdf.com', '', '', '', ''],
+        ['Hannah Wilson', 'hannah@wilsonfit.com', '617-555-0193', 'Wilson Fitness', 'Owner', 'Boston'],
+        ['Joseph Nguyen', 'joseph@saigonbistro.com', '408-555-0115', 'Saigon Bistro', 'Owner', 'San Jose'],
+        ['Grace Tan', 'grace.tan@orchidhotels.com', '702-555-0108', 'Orchid Hotels', 'Sales Manager', 'Las Vegas'],
+      ]),
+      mk('purchased_list.csv', ['Contact Name', 'Email', 'Tel', 'Business Name', 'Role', 'Lead Source'], [
+        ['Smith, John', '', '(415)5550132', 'Brightpath Solar', 'Ops Manager', 'Purchased list'],
+        ['David Chen', 'DChen@NovaBuild.co', '6465550190', 'Nova Build Co', 'Project Director', 'Purchased list'],
+        ['Michael OBrien', 'mobrien@summitroofing.com', '720-555-0111', 'Summit Roofing Corporation', 'Senior Estimator', 'Purchased list'],
+        ['sarah mcdonald', 'sarah@mcdonaldlaw.com', '503-555-0198', 'Mcdonald Law Group', 'partner', 'Purchased list'],
+        ['KEVIN PATEL', 'kevin@patelrealty.com', '', 'Patel Realty', 'Broker', 'Purchased list'],
+        ['Ramon dela Cruz', 'ramon.delacruz@islandtech.ph', '+63 917 123 4567', 'Islandtech Solutions, Inc.', 'IT Manager', 'Purchased list'],
+        ['Angela Reyes', 'angela.reyes@visayasfoods.com', '+639281234567', 'Visayas Foods Corporation', 'Purchasing Head', 'Purchased list'],
+        ['Daniel Foster', 'dan.foster@keystoneins.com', '215-555-0172', 'Keystone Insurance Agency', 'Agent', 'Purchased list'],
+        ['Dan Foster', 'daniel.foster@gmail.com', '(215) 555-0172', 'Keystone Insurance', 'Insurance Agent', 'Purchased list'],
+        ['Thomas Wright', 'twright@ironcladsecurity.com', '615-555-0147', 'Ironclad Security', 'CEO', 'Purchased list'],
+        ['Nicole Brown', 'nicole@brownmarketing.co', '305-555-0119', 'Brown Marketing Co', 'Account Director', 'Purchased list'],
+        ['Steven Clark', 's.clark@clarkauto.com', '313-555-0161', 'Clark Auto Parts', 'General Manager', 'Purchased list'],
+        ['Robert Hayes', 'robert.hayes@', '', 'Hayes Electric', 'Owner', 'Purchased list'],
+        ['Mike Chen', '', '123-456-7890', '', '', 'Purchased list'],
+        ['Hannah Wilson', 'hannah@wilsonfit.com', '6175550193', 'Wilson Fitness LLC', 'Owner', 'Purchased list'],
+        ['Olivia Martinez', 'olivia.martinez@gmail.com', '480.555.0124', 'Martinez Events', 'Event Planner', 'Purchased list'],
+      ]),
+    ];
+  }
+
+  function toCSV(rows) {
+    return rows.map(r => r.map(v => {
+      v = v == null ? '' : String(v);
+      if (/^[=@]/.test(v) || /^[+\-][^\d\s(]/.test(v)) v = "'" + v;
+      return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(',')).join('\r\n');
+  }
+
+  return {FIELDS, FIELD_LABEL, parseCSV, rowsToTable, detectMapping, cleanRecord, analyze, build, options, sampleFiles, toCSV, jw, nameSim};
+})();
+</script>
+
+<script>
+/* ================= SCRUBBR UI ================= */
+(() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const PAGE = 25;
+  const S = {files: [], recs: [], an: null, res: null, dec: {}, fdec: {}, choices: {}, tab: 'report', page: {clean: 0, log: 0}, q: {clean: '', log: ''}};
+
+  const ICON = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg>',
+  };
+
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200); }
+
+  /* ---------- navigation ---------- */
+  function go(step) {
+    ['upload', 'map', 'results'].forEach((n, i) => $('#screen-' + n).classList.toggle('hidden', i + 1 !== step));
+    document.querySelectorAll('.step').forEach(el => { const s = +el.dataset.step; el.classList.toggle('on', s === step); el.classList.toggle('done', s < step); });
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  /* ---------- intake ---------- */
+  function addFile(name, headers, rows) {
+    if (!headers.length || !rows.length) { toast(`${name}: no rows found`); return; }
+    S.files.push({name, headers, rows, mapping: Scrub.detectMapping(headers)});
+    renderFiles();
+  }
+  function renderFiles() {
+    $('#fileList').innerHTML = S.files.map((f, i) => `<div class="fchip"><b>${esc(f.name)}</b><span class="muted">${f.rows.length} rows</span><button data-rm="${i}" aria-label="Remove ${esc(f.name)}">✕</button></div>`).join('');
+    $('#toMapBtn').disabled = !S.files.length;
+  }
+  async function readFiles(list) {
+    for (const file of list) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      try {
+        if (ext === 'xlsx' || ext === 'xls') {
+          if (!window.XLSX) { toast('Excel reader is still loading — try again in a moment'); continue; }
+          const wb = XLSX.read(await file.arrayBuffer(), {type: 'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header: 1, defval: '', raw: false});
+          const t = Scrub.rowsToTable(rows.filter(r => r.some(c => String(c).trim())));
+          addFile(file.name, t.headers, t.rows);
+        } else {
+          const t = Scrub.rowsToTable(Scrub.parseCSV(await file.text()));
+          addFile(file.name, t.headers, t.rows);
+        }
+      } catch (e) { toast(`Couldn't read ${file.name}`); console.error(e); }
+    }
+  }
+  const drop = $('#drop'), fi = $('#fileInput');
+  drop.addEventListener('click', () => fi.click());
+  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); } });
+  fi.addEventListener('change', () => { readFiles([...fi.files]); fi.value = ''; });
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => readFiles([...e.dataTransfer.files]));
+  $('#fileList').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (b) { S.files.splice(+b.dataset.rm, 1); renderFiles(); } });
+  $('#pasteBtn').addEventListener('click', () => {
+    const txt = $('#pasteBox').value; if (!txt.trim()) return toast('Paste some rows first');
+    const t = Scrub.rowsToTable(Scrub.parseCSV(txt));
+    const n = S.files.filter(f => f.name.startsWith('Pasted leads')).length;
+    addFile(n ? `Pasted leads ${n + 1}` : 'Pasted leads', t.headers, t.rows);
+    $('#pasteBox').value = '';
+  });
+  $('#sampleBtn').addEventListener('click', () => {
+    S.files = S.files.filter(f => !Scrub.sampleFiles().some(s => s.name === f.name));
+    Scrub.sampleFiles().forEach(f => addFile(f.name, f.headers, f.rows));
+    $('#country').value = 'US';
+    toast('Loaded 3 messy sample files');
+  });
+  $('#toMapBtn').addEventListener('click', () => { renderMap(); go(2); });
+
+  /* ---------- mapping ---------- */
+  function renderMap() {
+    const opts = sel => `<option value="">— Ignore —</option>` + Scrub.FIELDS.map(f => `<option value="${f.key}" ${sel === f.key ? 'selected' : ''}>${f.label}</option>`).join('');
+    $('#mapGrid').innerHTML = S.files.map((f, fi) => {
+      const vals = Object.values(f.mapping);
+      const noContact = !vals.includes('email') && !vals.includes('phone');
+      return `<div class="card">
+        <div class="spread pad" style="padding-bottom:12px"><h3 style="font-size:17px">${esc(f.name)}</h3><span class="muted" style="font-size:13px">${f.rows.length} rows · ${f.headers.length} columns</span></div>
+        ${noContact ? `<div class="warn" style="margin:0 22px 12px">No email or phone column mapped — Scrubbr needs at least one to find duplicates.</div>` : ''}
+        <div class="tscroll"><table><thead><tr><th>Your column</th><th>Sample values</th><th>Maps to</th></tr></thead><tbody>
+        ${f.headers.map(h => `<tr><td><b>${esc(h)}</b></td><td class="muted mono">${f.rows.slice(0, 3).map(r => esc(r[h]) || '<i>blank</i>').join('<br>')}</td>
+          <td><select data-file="${fi}" data-h="${esc(h)}">${opts(f.mapping[h])}</select></td></tr>`).join('')}
+        </tbody></table></div></div>`;
+    }).join('');
+  }
+  $('#mapGrid').addEventListener('change', e => {
+    const s = e.target.closest('select[data-file]'); if (!s) return;
+    const f = S.files[+s.dataset.file];
+    if (s.value) Object.keys(f.mapping).forEach(h => { if (f.mapping[h] === s.value && h !== s.dataset.h) f.mapping[h] = ''; });
+    f.mapping[s.dataset.h] = s.value; renderMap();
+  });
+  $('#backUpload').addEventListener('click', () => go(1));
+  $('#scrubBtn').addEventListener('click', () => {
+    const country = $('#country').value;
+    S.recs = []; let id = 0;
+    S.files.forEach(f => f.rows.forEach(row => { S.recs.push(Scrub.cleanRecord(row, f.mapping, f.name, country, id++)); }));
+    S.an = Scrub.analyze(S.recs);
+    S.dec = {}; S.fdec = {}; S.choices = {}; S.page = {clean: 0, log: 0}; S.q = {clean: '', log: ''};
+    S.tab = 'report';
+    recompute(); go(3);
+  });
+
+  /* ---------- results ---------- */
+  function recompute() { S.res = Scrub.build(S.recs, S.an, S.dec, S.fdec); renderResults(); }
+  function renderResults() {
+    const st = S.res.stats;
+    $('#resultSub').textContent = `${st.recordsIn} records from ${st.files} file${st.files === 1 ? '' : 's'} · ${new Date().toLocaleString()}`;
+    $('#stats').innerHTML = `
+      <div class="card stat"><div class="l">Records in</div><div class="n">${st.recordsIn}</div><div class="s">${st.files} source file${st.files === 1 ? '' : 's'}</div></div>
+      <div class="card stat"><div class="l">Duplicates removed</div><div class="n">${st.dupRemoved}</div><div class="s">${st.autoRemoved} auto · ${st.reviewRemoved} after review</div></div>
+      <div class="card stat"><div class="l">Fields corrected</div><div class="n">${st.fieldsCorrected}</div><div class="s">across ${st.recordsCorrected} records</div></div>
+      <div class="card stat"><div class="l">Needs review</div><div class="n" style="color:${st.needsReview ? 'var(--lilac)' : 'inherit'}">${st.needsReview}</div><div class="s">${st.pendingItems} matches · ${st.heldUndecided} flagged</div></div>
+      <div class="card stat hl"><div class="l">Clean leads out</div><div class="n">${st.clean}</div><div class="s">${st.excluded} excluded</div></div>`;
+    $('#bClean').textContent = st.clean;
+    $('#bReview').textContent = st.needsReview; $('#bReview').classList.toggle('alert', st.needsReview > 0);
+    $('#bLog').textContent = st.fieldsCorrected;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === S.tab));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('hidden', p.id !== 'panel-' + S.tab));
+    ({report: renderReport, clean: renderClean, review: renderReview, log: renderLog})[S.tab]();
+  }
+  document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) { S.tab = t.dataset.tab; renderResults(); } });
+  $('#backMap').addEventListener('click', () => { renderMap(); go(2); });
+  $('#restartBtn').addEventListener('click', () => { if (!confirm('Start over? Your review decisions will be cleared.')) return; S.files = []; renderFiles(); go(1); });
+
+  /* report */
+  function bars(obj, cls) {
+    const e = Object.entries(obj).sort((a, b) => b[1] - a[1]); const max = Math.max(1, ...e.map(x => x[1]));
+    return e.length ? e.map(([k, v]) => `<div class="bar ${cls || ''}"><span>${esc(k)}</span><div class="t"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div><span class="v">${v}</span></div>`).join('') : '<div class="muted" style="font-size:13px">None 🎉</div>';
+  }
+  function renderReport() {
+    const st = S.res.stats;
+    const blockingTypes = {}, warnTypes = {};
+    S.res.masters.forEach(m => { m.blocking.forEach(x => blockingTypes[x] = (blockingTypes[x] || 0) + 1); m.warnings.forEach(x => warnTypes[x] = (warnTypes[x] || 0) + 1); });
+    // diverse before/after samples
+    const byF = {}; S.res.changes.forEach(c => (byF[c.field] = byF[c.field] || []).push(c));
+    const samples = []; let i = 0;
+    while (samples.length < 10 && Object.values(byF).some(a => a[i])) { Object.values(byF).forEach(a => { if (a[i] && samples.length < 10) samples.push(a[i]); }); i++; }
+    const pct = st.recordsIn ? Math.round((1 - st.clean / st.recordsIn) * 100) : 0;
+    $('#panel-report').innerHTML = `<div class="card report">
+      <div class="rep-top">
+        <div><div class="pill">Before &amp; after report</div><h2>Lead cleanup summary</h2><div class="muted" style="font-size:13.5px">Generated ${esc(new Date().toLocaleString())} · Files: ${Object.entries(st.byFile).map(([f, n]) => `${esc(f)} (${n})`).join(', ')}</div></div>
+        <button class="btn sm no-print" id="printBtn2">⎙ Save as PDF</button>
+      </div>
+      <div class="flow">
+        <div class="box"><div class="muted">Messy records in</div><div class="n">${st.recordsIn}</div></div>
+        <div class="arrow">→</div>
+        <div class="box out"><div class="muted">Clean, CRM-ready leads</div><div class="n">${st.clean}</div><div class="muted" style="font-size:12.5px">${pct}% of the original list was duplicate, fake or incomplete</div></div>
+      </div>
+      <div class="rgrid">
+        <div class="rbox"><h3>Duplicates</h3>
+          <div class="bar"><span>Auto-merged</span><div class="t"><i style="width:${st.dupRemoved ? st.autoRemoved / st.dupRemoved * 100 : 0}%"></i></div><span class="v">${st.autoRemoved}</span></div>
+          <div class="bar"><span>After review</span><div class="t"><i style="width:${st.dupRemoved ? st.reviewRemoved / st.dupRemoved * 100 : 0}%"></i></div><span class="v">${st.reviewRemoved}</span></div>
+          <div class="bar amber"><span>Awaiting review</span><div class="t"><i style="width:${st.pendingItems ? 100 : 0}%"></i></div><span class="v">${st.pendingItems}</span></div>
+        </div>
+        <div class="rbox"><h3>Fields corrected (${st.fieldsCorrected})</h3>${bars(st.byField)}</div>
+        <div class="rbox"><h3>Held for review</h3>${bars(blockingTypes, 'red')}</div>
+        <div class="rbox"><h3>Passed with notes</h3>${bars(warnTypes, 'amber')}</div>
+      </div>
+      <div class="rbox"><h3>Before → after examples</h3>
+        <div class="tscroll"><table><thead><tr><th>Field</th><th>Before</th><th>After</th><th>Source</th></tr></thead><tbody>
+        ${samples.map(c => `<tr><td>${esc(c.field)}</td><td class="mono before">${esc(c.before)}</td><td class="mono after">${esc(c.after || '(removed)')}</td><td class="muted">${esc(c.file)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No corrections needed.</td></tr>'}
+        </tbody></table></div>
+      </div>
+    </div>`;
+    const p2 = $('#printBtn2'); if (p2) p2.addEventListener('click', printReport);
+  }
+
+  /* clean leads */
+  function searchFilter(list, q, fn) { q = q.trim().toLowerCase(); return q ? list.filter(x => fn(x).toLowerCase().includes(q)) : list; }
+  function pager(key, total) {
+    const pages = Math.max(1, Math.ceil(total / PAGE)); if (S.page[key] >= pages) S.page[key] = pages - 1;
+    const p = S.page[key];
+    return `<div class="pager"><span>${total ? `${p * PAGE + 1}–${Math.min(total, (p + 1) * PAGE)} of ${total}` : '0 results'}</span>
+      <span class="row"><button class="btn sm" data-pg="${key}" data-d="-1" ${p === 0 ? 'disabled' : ''}>← Prev</button><button class="btn sm" data-pg="${key}" data-d="1" ${p >= pages - 1 ? 'disabled' : ''}>Next →</button></span></div>`;
+  }
+  function renderClean() {
+    const list = searchFilter(S.res.clean, S.q.clean, m => [m.fullName, m.email, m.phone, m.company, m.title, m.city].join(' '));
+    const p = S.page.clean, rows = list.slice(p * PAGE, (p + 1) * PAGE);
+    $('#panel-clean').innerHTML = `<div class="toolbar"><input type="search" id="qClean" placeholder="Search clean leads…" value="${esc(S.q.clean)}"></div>
+      <div class="card">${list.length ? `<div class="tscroll"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Title</th><th>Source</th><th>Notes</th></tr></thead><tbody>
+      ${rows.map(m => `<tr><td><b>${esc(m.fullName) || '<span class="muted">—</span>'}</b>${m.ids.length > 1 ? `<span class="merged" title="Merged from ${m.ids.length} records">×${m.ids.length}</span>` : ''}</td>
+        <td class="mono">${esc(m.email) || '<span class="muted">—</span>'}</td><td class="mono" style="white-space:nowrap">${esc(m.phone) || '<span class="muted">—</span>'}</td>
+        <td>${esc(m.company) || '<span class="muted">—</span>'}</td><td>${esc(m.title)}</td><td class="muted" style="font-size:12.5px">${m.sources.map(esc).join('<br>')}</td>
+        <td>${m.warnings.map(w => `<span class="chip amber">${esc(w)}</span>`).join('')}${m.blocking.length ? '<span class="chip green">Approved</span>' : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty">No clean leads match.</div>`}</div>${pager('clean', list.length)}`;
+    bindSearch('#qClean', 'clean');
+  }
+  function bindSearch(sel, key) {
+    const inp = $(sel); if (!inp) return;
+    inp.addEventListener('input', () => { S.q[key] = inp.value; S.page[key] = 0; const pos = inp.selectionStart; renderResults(); const n = $(sel); n.focus(); n.setSelectionRange(pos, pos); });
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-pg]'); if (!b) return;
+    S.page[b.dataset.pg] += +b.dataset.d; renderResults();
+  });
+
+  /* review */
+  const FL = Scrub.FIELD_LABEL;
+  const fieldVal = (r, f) => f === 'name' ? r.fullName : r[f];
+  function defaultChoices(it) {
+    const c = {}; it.fields.forEach(f => { const o = Scrub.options(S.recs, it.ids, f); if (o.length) c[f] = o[0].rec.id; }); return c;
+  }
+  function renderReview() {
+    const items = S.an.items.slice().sort((a, b) => (!!S.dec[a.id]) - (!!S.dec[b.id]));
+    const held = S.res.held, decidedFlags = S.res.masters.filter(m => m.blocking.length && S.fdec[m.key]);
+    let html = '';
+    html += `<div class="sechead"><h2>Possible duplicates &amp; conflicts</h2><span class="muted">${items.filter(i => !S.dec[i.id]).length} to decide</span></div>`;
+    if (!items.length) html += `<div class="card empty">${ICON.check}<div>No uncertain matches — every duplicate was clear-cut.</div></div>`;
+    items.forEach(it => html += reviewCard(it));
+    html += `<div class="sechead" style="margin-top:28px"><h2>Incomplete or suspicious records</h2><span class="muted">${held.length} to decide</span></div>`;
+    const flagRows = [...held, ...decidedFlags];
+    if (!flagRows.length) html += `<div class="card empty">${ICON.check}<div>No flagged records.</div></div>`;
+    else html += `<div class="card">${flagRows.map(flagRow).join('')}</div>`;
+    $('#panel-review').innerHTML = html;
+  }
+  function reviewCard(it) {
+    const d = S.dec[it.id];
+    const recs = it.ids.map(i => S.recs[i]);
+    const typePill = it.type === 'duplicate' ? '<span class="chip lilac">Possible duplicate</span>' : '<span class="chip amber">Conflicting details</span>';
+    if (d) {
+      let summary;
+      if (d.action === 'merge') { const m = S.res.masters.find(x => x.ids.includes(it.ids[0])); summary = `Merged ${recs.length} records into <b>${esc(m ? (m.fullName || m.email) : '')}</b>${m && m.email ? ` · <span class="mono">${esc(m.email)}</span>` : ''}`; }
+      else summary = `Kept as ${recs.length} separate leads`;
+      return `<div class="card rcard"><div class="rdone">${ICON.check}${typePill}<span>${summary}</span><button class="btn ghost sm" data-undo="${it.id}" style="margin-left:auto">Undo</button></div></div>`;
+    }
+    const chosen = Object.assign(defaultChoices(it), S.choices[it.id] || {});
+    const rowsF = ['name', 'email', 'phone', 'company', 'title', 'city'];
+    const cmp = `<div class="tscroll"><table class="cmp"><thead><tr><th></th>${recs.map(r => `<th>${esc(r.file)}</th>`).join('')}</tr></thead><tbody>
+      ${rowsF.map(f => `<tr><td class="lbl">${FL[f]}</td>${recs.map(r => `<td class="${it.fields.includes(f) ? 'diff' : ''} ${f === 'email' || f === 'phone' ? 'mono' : ''}">${esc(fieldVal(r, f)) || '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>`;
+    const choiceFields = it.fields.filter(f => f !== 'city' || true);
+    const choices = choiceFields.length ? `<div style="padding:14px 20px 4px;font-size:13px" class="muted">If merged, keep:</div><div class="choices">
+      ${choiceFields.map(f => `<div class="choice"><span class="fl">${FL[f]}</span>${Scrub.options(S.recs, it.ids, f).map(o => `<label><input type="radio" name="ch-${it.id}-${f}" data-item="${it.id}" data-f="${f}" value="${o.rec.id}" ${chosen[f] === o.rec.id ? 'checked' : ''}><span class="${f === 'email' || f === 'phone' ? 'mono' : ''}">${esc(fieldVal(o.rec, f))}</span></label>`).join('')}</div>`).join('')}
+      </div>` : '';
+    return `<div class="card rcard">
+      <div class="rhead">${typePill}<h3>${esc(recs.map(r => r.fullName || r.email).filter((v, i, a) => a.indexOf(v) === i).join(' · '))}</h3><span class="muted" style="margin-left:auto;font-size:12.5px">Match confidence ${Math.round(it.score * 100)}%</span></div>
+      <ul class="reasons">${it.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+      <div style="padding:12px 8px 0">${cmp}</div>
+      ${choices}
+      <div class="ractions"><button class="btn accent sm" data-merge="${it.id}">Merge into one lead</button><button class="btn sm" data-sep="${it.id}">Keep separate</button></div>
+    </div>`;
+  }
+  function flagRow(m) {
+    const fd = S.fdec[m.key];
+    return `<div class="flagrow">
+      <div><b>${esc(m.fullName) || '<span class="muted">(no name)</span>'}</b><div class="muted" style="font-size:13px">${esc(m.company) || '—'} · ${esc(m.sources.join(', '))}</div></div>
+      <div><div class="mono" style="font-size:12.5px">${esc(m.email) || '<span class="muted">no email</span>'} · ${esc(m.phone) || '<span class="muted">no phone</span>'}</div>
+        ${m.blocking.map(x => `<span class="chip red">${esc(x)}</span>`).join('')}${m.warnings.map(x => `<span class="chip amber">${esc(x)}</span>`).join('')}</div>
+      <div class="row">${fd ? `<span class="chip ${fd === 'approve' ? 'green' : ''}">${fd === 'approve' ? 'Approved' : 'Excluded'}</span><button class="btn ghost sm" data-fundo="${m.key}">Undo</button>`
+        : `<button class="btn sm" data-approve="${m.key}">Approve anyway</button><button class="btn sm" data-exclude="${m.key}">Exclude</button>`}</div>
+    </div>`;
+  }
+  $('#panel-review').addEventListener('change', e => {
+    const r = e.target.closest('input[data-item]'); if (!r) return;
+    (S.choices[r.dataset.item] = S.choices[r.dataset.item] || {})[r.dataset.f] = +r.value;
+  });
+  $('#panel-review').addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    const ds = t.dataset;
+    if (ds.merge) { const it = S.an.items.find(i => i.id === ds.merge); S.dec[it.id] = {action: 'merge', fields: Object.assign(defaultChoices(it), S.choices[it.id] || {})}; toast('Merged'); }
+    else if (ds.sep) { S.dec[ds.sep] = {action: 'separate'}; toast('Kept separate'); }
+    else if (ds.undo) delete S.dec[ds.undo];
+    else if (ds.approve) { S.fdec[ds.approve] = 'approve'; toast('Approved — moved to clean leads'); }
+    else if (ds.exclude) { S.fdec[ds.exclude] = 'exclude'; toast('Excluded'); }
+    else if (ds.fundo) delete S.fdec[ds.fundo];
+    else return;
+    const y = window.scrollY; recompute(); window.scrollTo(0, y);
+  });
+
+  /* change log */
+  function renderLog() {
+    const list = searchFilter(S.res.changes, S.q.log, c => [c.name, c.field, c.before, c.after, c.file].join(' '));
+    const p = S.page.log, rows = list.slice(p * PAGE, (p + 1) * PAGE);
+    $('#panel-log').innerHTML = `<div class="toolbar"><input type="search" id="qLog" placeholder="Search changes (try “Phone” or “gmail”)…" value="${esc(S.q.log)}"></div>
+      <div class="card">${list.length ? `<div class="tscroll"><table><thead><tr><th>Record</th><th>Field</th><th>Before</th><th>After</th><th>File</th></tr></thead><tbody>
+      ${rows.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.field)}</td><td class="mono before">${esc(c.before)}</td><td class="mono after">${esc(c.after) || '<span class="muted">(blank)</span>'}</td><td class="muted">${esc(c.file)}</td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty">No changes match.</div>`}</div>${pager('log', list.length)}`;
+    bindSearch('#qLog', 'log');
+  }
+
+  /* ---------- exports ---------- */
+  function download(name, text) {
+    const blob = new Blob(['\uFEFF' + text], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  const stamp = () => new Date().toISOString().slice(0, 10);
+  $('#dlClean').addEventListener('click', () => {
+    const fmt = $('#crmFormat').value;
+    const H = {
+      generic: ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Job Title', 'Website', 'City', 'Lead Source', 'Merged Records', 'Scrubbr Notes'],
+      hubspot: ['First Name', 'Last Name', 'Email', 'Phone Number', 'Company Name', 'Job Title', 'Website URL', 'City', 'Lead Source', 'Merged Records', 'Scrubbr Notes'],
+      salesforce: ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Title', 'Website', 'City', 'Lead Source', 'Merged Records', 'Description'],
+    }[fmt];
+    const rows = S.res.clean.map(m => [m.firstName, m.lastName || (fmt === 'salesforce' ? '[not provided]' : ''), m.email, m.phone,
+      m.company || (fmt === 'salesforce' ? '[not provided]' : ''), m.title, m.website, m.city, m.sources.join('; '), m.ids.length, m.warnings.join('; ')]);
+    download(`scrubbr_clean_leads_${fmt}_${stamp()}.csv`, Scrub.toCSV([H, ...rows]));
+    toast(`Exported ${rows.length} clean leads`);
+  });
+  $('#dlReview').addEventListener('click', () => {
+    const H = ['Status', 'Reason', 'Name', 'Email', 'Phone', 'Company', 'Title', 'Source File'];
+    const rows = [];
+    S.res.pendingClusters.forEach(c => {
+      const it = c.item; const reason = it ? it.reasons.join(' | ') : 'Pending review';
+      c.ids.forEach(i => { const r = S.recs[i]; rows.push(['Possible duplicate — pending', reason, r.fullName, r.email, r.phone, r.company, r.title, r.file]); });
+    });
+    S.res.held.forEach(m => rows.push(['Flagged — pending', m.blocking.join('; '), m.fullName, m.email, m.phone, m.company, m.title, m.sources.join('; ')]));
+    S.res.excluded.forEach(m => rows.push(['Excluded', m.blocking.join('; '), m.fullName, m.email, m.phone, m.company, m.title, m.sources.join('; ')]));
+    if (!rows.length) return toast('Nothing needs review 🎉');
+    download(`scrubbr_needs_review_${stamp()}.csv`, Scrub.toCSV([H, ...rows]));
+  });
+  $('#dlLog').addEventListener('click', () => {
+    const rows = S.res.changes.map(c => [c.name, c.field, c.before, c.after, c.file]);
+    download(`scrubbr_change_log_${stamp()}.csv`, Scrub.toCSV([['Record', 'Field', 'Before', 'After', 'Source File'], ...rows]));
+  });
+  function printReport() { S.tab = 'report'; renderResults(); setTimeout(() => window.print(), 50); }
+  $('#printBtn').addEventListener('click', printReport);
+
+  go(1);
+})();
+</script>
+</body>
+</html>
