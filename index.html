@@ -104,6 +104,19 @@ select,input[type=search],input[type=text]{border:1px solid var(--line);backgrou
 .privacy{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted);margin-top:18px}
 .privacy svg{width:18px;height:18px;color:var(--accent);flex:none}
 
+.itabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.itab{border:1px solid var(--line);background:var(--surface);padding:9px 16px;border-radius:999px;cursor:pointer;font-weight:500;color:var(--muted)}
+.itab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:820px){.fgrid{grid-template-columns:1fr 1fr}}
+.fgrid input{width:100%}
+.patlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.pat{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface2)}
+.pat small{color:var(--muted);font-size:11px;display:block}
+.cbx{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}
+tr.done td{opacity:.55}
+.readybar .filelist{margin-top:10px}
+
 /* Mapping */
 .mapgrid{display:grid;gap:18px}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -238,6 +251,13 @@ tr:last-child td{border-bottom:0}
     </div>
   </div>
 
+  <div class="itabs no-print" role="tablist">
+    <button class="itab on" data-itab="files">📄 Upload or paste lists</button>
+    <button class="itab" data-itab="extract">✨ Lead Extractor</button>
+    <button class="itab" data-itab="finder">✉️ Email finder</button>
+  </div>
+
+  <div class="ipane" id="ipane-files">
   <div class="intake">
     <div class="card pad">
       <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload lead files">
@@ -246,7 +266,6 @@ tr:last-child td{border-bottom:0}
         <div class="muted">CSV, TSV or Excel — add as many files as you like</div>
         <input type="file" id="fileInput" multiple accept=".csv,.tsv,.txt,.xlsx,.xls" class="hidden">
       </div>
-      <div class="filelist" id="fileList"></div>
       <div class="spread" style="margin-top:18px">
         <button class="btn" id="sampleBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/></svg>
@@ -263,6 +282,48 @@ tr:last-child td{border-bottom:0}
       <textarea id="pasteBox" placeholder="Name, Email, Phone, Company&#10;jane doe, Jane@Acme.com, 4155550101, ACME INC"></textarea>
       <div class="row" style="margin-top:10px"><button class="btn sm" id="pasteBtn">Add pasted leads</button></div>
     </div>
+  </div>
+  </div>
+
+  <!-- LEAD EXTRACTOR -->
+  <div class="ipane hidden" id="ipane-extract">
+    <div class="card pad">
+      <div class="spread" style="margin-bottom:10px">
+        <div>
+          <h3 style="font-size:19px">Lead Extractor</h3>
+          <div class="muted" style="font-size:13.5px">Copy any page — a business directory, member list, search results, email signatures — and paste it here. Scrubbr pulls out names, emails, phones, companies and websites.</div>
+        </div>
+        <button class="btn sm" id="exExample">Load an example</button>
+      </div>
+      <textarea id="exBox" style="min-height:200px" placeholder="Paste text or page source here…&#10;&#10;Tip: on a website, press Ctrl+A then Ctrl+C to copy the whole page, or right-click → View page source for even better results."></textarea>
+      <div class="spread" style="margin-top:12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px">Label these leads as
+          <input type="text" id="exSource" placeholder="e.g. Austin Chamber directory" style="min-width:220px">
+        </label>
+        <button class="btn accent" id="exRun">Extract leads</button>
+      </div>
+      <div id="exResult"></div>
+    </div>
+  </div>
+
+  <!-- EMAIL FINDER -->
+  <div class="ipane hidden" id="ipane-finder">
+    <div class="card pad">
+      <h3 style="font-size:19px">Email finder</h3>
+      <div class="muted" style="font-size:13.5px;margin-bottom:14px">Know the person and their company website but not their email? Get the most common email formats to try. These are guesses — verify before a big send.</div>
+      <div class="fgrid">
+        <label class="field">First name<input type="text" id="efFirst" placeholder="John"></label>
+        <label class="field">Last name<input type="text" id="efLast" placeholder="Smith"></label>
+        <label class="field">Company website or domain<input type="text" id="efDomain" placeholder="brightpathsolar.com"></label>
+        <label class="field">Company (optional)<input type="text" id="efCompany" placeholder="BrightPath Solar"></label>
+      </div>
+      <div id="efResult" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="card pad readybar" id="readyBar" style="margin-top:18px">
+    <div class="spread"><b style="font-size:14px">Lists ready to scrub</b><span class="muted" style="font-size:13px">Everything here gets cleaned and de-duplicated together — new leads are checked against your existing list.</span></div>
+    <div class="filelist" id="fileList"></div>
   </div>
 
   <div class="spread" style="margin-top:22px">
@@ -307,6 +368,7 @@ tr:last-child td{border-bottom:0}
         <label class="field" style="flex-direction:row;align-items:center;gap:8px">Export format
           <select id="crmFormat"><option value="generic">Generic CSV</option><option value="hubspot">HubSpot import</option><option value="salesforce">Salesforce leads</option></select>
         </label>
+        <select id="expWhich" aria-label="Which leads to export"><option value="all">All clean leads</option><option value="todo">Not contacted yet only</option></select>
       </div>
       <div class="row">
         <button class="btn accent sm" id="dlClean">⬇ Clean leads CSV</button>
@@ -350,7 +412,10 @@ const Scrub = (() => {
     {key:'website',   label:'Website',    syn:['website','url','web','domain','site','web site','company website']},
     {key:'city',      label:'City',       syn:['city','location','town','municipality']},
     {key:'source',    label:'Lead source',syn:['source','lead source','channel','origin']},
+    {key:'contacted', label:'Contacted (checkbox)', syn:['contacted','messaged','message sent','sent','emailed','email sent','reached out','outreach','called','texted','done','dm sent','dmed','already contacted','msg sent','followed up']},
   ];
+  const KEEP = '__keep';
+  const truthy = v => /^(true|yes|y|x|✓|✔|☑|☒|1|done|sent|contacted|messaged|emailed|called|checked)$/i.test(clean(v));
   const FREE = new Set(['gmail.com','googlemail.com','yahoo.com','yahoo.com.ph','ymail.com','rocketmail.com','hotmail.com','outlook.com','live.com','msn.com','aol.com','icloud.com','me.com','mac.com','protonmail.com','proton.me','gmx.com','mail.com','zoho.com','yandex.com']);
   const ROLE = new Set(['info','sales','admin','support','contact','hello','office','team','help','enquiries','inquiries','marketing','billing','hr','careers','jobs','service','mail','general']);
   const FAKE_LOCAL = /^(test\d*|testing|asdf+|qwerty|abc|abc123|a+|x+|fake|none|na|noemail|nobody|sample|null|dummy|nomail|no|123+)$/;
@@ -405,6 +470,7 @@ const Scrub = (() => {
     if ((used.has('firstName') || used.has('lastName')) && used.has('fullName')) {
       const h = headers.find(h => map[h] === 'fullName'); if (h) map[h] = '';
     }
+    headers.forEach(h => { if (!map[h] && !/^Column \d+$/.test(h)) map[h] = KEEP; });
     return map;
   }
 
@@ -541,8 +607,13 @@ const Scrub = (() => {
   /* ---------- record ---------- */
   function cleanRecord(row, mapping, file, country, id) {
     const o = {};
-    for (const [h, f] of Object.entries(mapping)) { if (!f) continue; const v = clean(row[h]); if (v && !o[f]) o[f] = v; }
-    const r = {id, file, orig: o, changes: []};
+    const extra = {};
+    for (const [h, f] of Object.entries(mapping)) {
+      if (!f) continue; const v = clean(row[h]);
+      if (f === KEEP) { extra[h] = v; continue; }
+      if (v && !o[f]) o[f] = v;
+    }
+    const r = {id, file, orig: o, changes: [], extra, contacted: truthy(o.contacted)};
     const ch = (field, before, after) => { if (before && before !== after) r.changes.push({field, before, after}); };
     let first = '', last = '', origName = '';
     if (o.firstName || o.lastName) {
@@ -759,6 +830,8 @@ const Scrub = (() => {
       phone: pr ? pr.phone : '', phoneStatus: pr ? pr.phoneStatus : '',
       company: cr ? cr.company : '', title: tr ? tr.title : '', website: wr ? wr.website : '', city: cir ? cir.city : '',
       sources: [...new Set(ids.map(i => recs[i].source))],
+      contacted: ids.some(i => recs[i].contacted),
+      extra: (() => { const e = {}; ids.slice().sort((a, b) => recs[b].completeness - recs[a].completeness).forEach(i => Object.entries(recs[i].extra || {}).forEach(([k, v]) => { if (v && !e[k]) e[k] = v; })); return e; })(),
       nameSuspicious: ids.some(i => recs[i].nameSuspicious) && (!!nr && nr.nameSuspicious || !!cr && cr.nameSuspicious),
     };
     const is = issues(m); m.blocking = is.blocking; m.warnings = is.warnings;
@@ -813,7 +886,7 @@ const Scrub = (() => {
     return {masters, clean, held, excluded, pendingClusters, changes,
       stats: {recordsIn: recs.length, files: Object.keys(byFile).length, byFile, dupRemoved: autoRemoved + reviewRemoved, reviewRemoved, autoRemoved,
         fieldsCorrected: changes.length, byField, byIssue, pendingItems, heldUndecided, needsReview: pendingItems + heldUndecided,
-        clean: clean.length, excluded: excluded.length, warned: clean.filter(m => m.warnings.length).length,
+        clean: clean.length, contactedClean: clean.filter(m => m.contacted).length, excluded: excluded.length, warned: clean.filter(m => m.warnings.length).length,
         recordsCorrected: recs.filter(r => r.changes.length).length}};
   }
 
@@ -821,17 +894,17 @@ const Scrub = (() => {
   function sampleFiles() {
     const mk = (name, headers, rows) => ({name, headers, rows: rows.map(r => { const o = {}; headers.forEach((h, i) => o[h] = r[i] || ''); return o; })});
     return [
-      mk('website_form_export.csv', ['First Name', 'Last Name', 'Email Address', 'Phone Number', 'Company', 'Job Title', 'Website'], [
-        ['John', 'Smith', 'john.smith@brightpathsolar.com', '(415) 555-0132', 'BrightPath Solar Inc', 'Operations Manager', 'https://www.brightpathsolar.com/'],
+      mk('website_form_export.csv', ['First Name', 'Last Name', 'Email Address', 'Phone Number', 'Company', 'Job Title', 'Website', 'Messaged'], [
+        ['John', 'Smith', 'john.smith@brightpathsolar.com', '(415) 555-0132', 'BrightPath Solar Inc', 'Operations Manager', 'https://www.brightpathsolar.com/', 'FALSE'],
         ['maria', 'santos', 'maria.santos@harborlogistics.com', '312-555-0177', 'Harbor Logistics LLC', 'Procurement Lead', ''],
-        ['David', 'Chen', 'dchen@novabuild.co', '646.555.0190', 'NovaBuild Co.', 'Project Director', 'novabuild.co'],
+        ['David', 'Chen', 'dchen@novabuild.co', '646.555.0190', 'NovaBuild Co.', 'Project Director', 'novabuild.co', 'TRUE'],
         ['Aisha', 'Rahman', 'aisha@greenleafcafe.com', '2125550143', 'Greenleaf Cafe', 'Owner', 'greenleafcafe.com'],
         ['Michael', "O'Brien", 'mobrien@summitroofing.com', '+1 720 555 0111', 'Summit Roofing Corp', 'Estimator', 'summitroofing.com'],
         ['SARAH', 'MCDONALD', 'Sarah@McDonaldLaw.com', '(503) 555-0198', 'McDonald Law Group', 'Partner', ''],
         ['Carlos', 'Rivera', 'carlos.rivera@sunvalleyhvac.com', '602-555-0164', 'Sun Valley HVAC', 'Service Manager', 'sunvalleyhvac.com'],
         ['Emily', 'Johnson', 'emily.j@peakdental.com', '404-555-0129', 'Peak Dental Studio', 'Office Manager', ''],
-        ['Kevin', 'Patel', 'kevin@patelrealty.com', '713-555-0156', 'Patel Realty Group', 'Broker', 'patelrealty.com'],
-        ['Jasmine', 'Lee', 'jlee@bloomflorals.com', '206-555-0182', 'Bloom Florals', 'Founder', 'bloomflorals.com'],
+        ['Kevin', 'Patel', 'kevin@patelrealty.com', '713-555-0156', 'Patel Realty Group', 'Broker', 'patelrealty.com', 'TRUE'],
+        ['Jasmine', 'Lee', 'jlee@bloomflorals.com', '206-555-0182', 'Bloom Florals', 'Founder', 'bloomflorals.com', 'TRUE'],
         ['Brian', 'Kim', 'brian.kim@acmesolar.com', '619-555-0135', 'Acme Solar', 'Sales Director', 'acmesolar.com'],
         ['Rachel', 'Green', 'rachel@lumenstudio.com', '917-555-0150', 'Lumen Studio', 'Creative Director', ''],
         ['Mark', 'Davis', 'info@davisplumbing.com', '512-555-0186', 'Davis Plumbing', 'Owner', 'davisplumbing.com'],
@@ -840,14 +913,14 @@ const Scrub = (() => {
         ['Paul', 'Stone', 'paul.stone@gmial.com', '(469) 555-0103', 'Stone Masonry', 'Owner', ''],
         ['', '', 'contact@sunrisebakery.com', '(626) 555-0177', 'Sunrise Bakery', '', ''],
         ['Chris', 'Evans', 'chris@evansmedia.io', '555-0199', 'Evans Media', 'Producer', 'evansmedia.io'],
-        ['Grace', 'Tan', 'grace.tan@orchidhotels.com', '702-555-0108', 'Orchid Hotels', 'Sales Manager', 'orchidhotels.com'],
+        ['Grace', 'Tan', 'grace.tan@orchidhotels.com', '702-555-0108', 'Orchid Hotels', 'Sales Manager', 'orchidhotels.com', 'FALSE'],
         ['Patricia', 'Moore', 'pmoore@moorecpa.com', '919-555-0138', 'Moore CPA Firm', 'Partner', 'moorecpa.com'],
       ]),
-      mk('tradeshow_signups.csv', ['Full Name', 'E-mail', 'Mobile', 'Organization', 'Position', 'City'], [
-        ['JOHN SMITH', ' John.Smith@BrightPathSolar.com ', '415.555.0132', 'BRIGHTPATH SOLAR, INC.', 'OPERATIONS MANAGER', 'San Francisco'],
+      mk('tradeshow_signups.csv', ['Full Name', 'E-mail', 'Mobile', 'Organization', 'Position', 'City', 'Messaged'], [
+        ['JOHN SMITH', ' John.Smith@BrightPathSolar.com ', '415.555.0132', 'BRIGHTPATH SOLAR, INC.', 'OPERATIONS MANAGER', 'San Francisco', '✓'],
         ['Jon Smith', 'jsmith@brightpathsolar.com', '415-555-0199', 'BrightPath Solar Inc.', 'Field Technician', 'San Francisco'],
         ['maria santos', 'MARIA.SANTOS@HARBORLOGISTICS.COM', '312 555 0100', 'harbor logistics, llc', 'procurement lead', 'chicago'],
-        ['Aisha Rahman', 'aisha@greenleafcafe,com', '212-555-0143', 'GREENLEAF CAFE', 'owner', 'New York'],
+        ['Aisha Rahman', 'aisha@greenleafcafe,com', '212-555-0143', 'GREENLEAF CAFE', 'owner', 'New York', 'yes'],
         ['Carlos  Rivera', 'carlos.rivera@sunvalleyhvac.con', '(602) 555-0164', 'Sun Valley HVAC', 'Service Manager', 'Phoenix'],
         ['Emily Johnson', 'emily.j@peakdental.com', '404-555-0129 ext 12', 'Peak Dental Studio', 'Office Mgr', 'Atlanta'],
         ['Ramon Dela Cruz', 'ramon.delacruz@islandtech.ph', '0917 123 4567', 'IslandTech Solutions Inc.', 'IT Manager', 'Cebu City'],
@@ -858,11 +931,11 @@ const Scrub = (() => {
         ['Megan Ross', 'megan.ross@yaho.com', '(214) 555-0145', 'Ross Interiors', 'Designer', 'Dallas'],
         ['Jennifer Lopez', '', '', 'JL Designs', 'Owner', 'Los Angeles'],
         ['asdf', 'asdf@asdf.com', '', '', '', ''],
-        ['Hannah Wilson', 'hannah@wilsonfit.com', '617-555-0193', 'Wilson Fitness', 'Owner', 'Boston'],
+        ['Hannah Wilson', 'hannah@wilsonfit.com', '617-555-0193', 'Wilson Fitness', 'Owner', 'Boston', 'yes'],
         ['Joseph Nguyen', 'joseph@saigonbistro.com', '408-555-0115', 'Saigon Bistro', 'Owner', 'San Jose'],
         ['Grace Tan', 'grace.tan@orchidhotels.com', '702-555-0108', 'Orchid Hotels', 'Sales Manager', 'Las Vegas'],
       ]),
-      mk('purchased_list.csv', ['Contact Name', 'Email', 'Tel', 'Business Name', 'Role', 'Lead Source'], [
+      mk('purchased_list.csv', ['Contact Name', 'Email', 'Tel', 'Business Name', 'Role', 'Lead Source', 'Notes'], [
         ['Smith, John', '', '(415)5550132', 'Brightpath Solar', 'Ops Manager', 'Purchased list'],
         ['David Chen', 'DChen@NovaBuild.co', '6465550190', 'Nova Build Co', 'Project Director', 'Purchased list'],
         ['Michael OBrien', 'mobrien@summitroofing.com', '720-555-0111', 'Summit Roofing Corporation', 'Senior Estimator', 'Purchased list'],
@@ -872,15 +945,103 @@ const Scrub = (() => {
         ['Angela Reyes', 'angela.reyes@visayasfoods.com', '+639281234567', 'Visayas Foods Corporation', 'Purchasing Head', 'Purchased list'],
         ['Daniel Foster', 'dan.foster@keystoneins.com', '215-555-0172', 'Keystone Insurance Agency', 'Agent', 'Purchased list'],
         ['Dan Foster', 'daniel.foster@gmail.com', '(215) 555-0172', 'Keystone Insurance', 'Insurance Agent', 'Purchased list'],
-        ['Thomas Wright', 'twright@ironcladsecurity.com', '615-555-0147', 'Ironclad Security', 'CEO', 'Purchased list'],
-        ['Nicole Brown', 'nicole@brownmarketing.co', '305-555-0119', 'Brown Marketing Co', 'Account Director', 'Purchased list'],
-        ['Steven Clark', 's.clark@clarkauto.com', '313-555-0161', 'Clark Auto Parts', 'General Manager', 'Purchased list'],
+        ['Thomas Wright', 'twright@ironcladsecurity.com', '615-555-0147', 'Ironclad Security', 'CEO', 'Purchased list', 'Met at Q3 expo'],
+        ['Nicole Brown', 'nicole@brownmarketing.co', '305-555-0119', 'Brown Marketing Co', 'Account Director', 'Purchased list', 'Referral from Grace'],
+        ['Steven Clark', 's.clark@clarkauto.com', '313-555-0161', 'Clark Auto Parts', 'General Manager', 'Purchased list', 'Wants a demo in Nov'],
         ['Robert Hayes', 'robert.hayes@', '', 'Hayes Electric', 'Owner', 'Purchased list'],
         ['Mike Chen', '', '123-456-7890', '', '', 'Purchased list'],
         ['Hannah Wilson', 'hannah@wilsonfit.com', '6175550193', 'Wilson Fitness LLC', 'Owner', 'Purchased list'],
         ['Olivia Martinez', 'olivia.martinez@gmail.com', '480.555.0124', 'Martinez Events', 'Event Planner', 'Purchased list'],
       ]),
     ];
+  }
+
+  /* ---------- lead extractor ---------- */
+  const NAME_RE = /^(?:(?:mr|mrs|ms|dr|atty|engr)\.?\s+)?[A-Z][a-zA-Z'’-]+(?:\s+[A-Z]\.?)?(?:\s+(?:de|dela|del|van|von|da|di|la)?\s*[A-Z][a-zA-Z'’-]+){1,2}(?:,?\s+(?:Jr|Sr|II|III)\.?)?$/;
+  const CO_RE = /\b(inc|llc|l\.l\.c|corp|corporation|co\.|company|ltd|group|partners|solutions|services|agency|studio|associates|enterprises|holdings|industries|consulting|realty|logistics|construction|roofing|plumbing|electric|dental|clinic|law|firm|bakery|cafe|restaurant|hotel|marketing|media|labs|systems|technologies|tech|foods|builders|contractors|design|designs|insurance|cleaners|cleaning|landscaping|salon|spa|auto|repair|store|shop|supply|center|centre|academy|school|church|pharmacy|bistro|grill|kitchen|motors|electrical|hvac|painting|movers|moving|pest|pools|fitness|gym|photography|printing|travel|tours|farm|bank|capital|ventures|digital|creative|interiors|properties|homes|apparel)\b/i;
+  const TITLE_RE = /\b(manager|director|owner|ceo|cfo|coo|cto|founder|co-founder|president|vp|vice president|partner|agent|broker|principal|head|lead|officer|coordinator|specialist|consultant|supervisor|administrator|estimator|engineer|architect|realtor|attorney|accountant|cpa|executive|representative|associate|assistant|planner|designer|chef)\b/i;
+  const STREET_RE = /\b(street|st\.|avenue|ave|road|rd\.|blvd|suite|ste\.|floor|drive|dr\.|lane|ln\.|highway|hwy|p\.?o\.? box|zip)\b|\d{5}(-\d{4})?$/i;
+  const EMAIL_G = /[a-z0-9._%+'-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/gi;
+  const PHONE_G = /(?:\+?\d{1,3}[ .-]?)?(?:\(\d{2,4}\)|\d{2,4})[ .-]?\d{3,4}[ .-]?\d{3,4}(?:[ ]*(?:ext\.?|x)[ ]*\d{1,5})?/g;
+  const URL_G = /\b(?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:com|net|org|io|co|ph|us|biz|info|ca|uk|au|dev|app|agency|law|realty)(?:\/[^\s,;)"'<>]*)?/gi;
+  const BAD_EMAIL_TLD = /\.(png|jpe?g|gif|svg|webp|bmp|ico|css|js)$/i;
+
+  function htmlToText(html) {
+    const links = [];
+    html.replace(/href\s*=\s*["']\s*(mailto|tel):([^"'?]+)/gi, (_, k, v) => { links.push(decodeURIComponent(v)); return ''; });
+    let t = html.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<\s*(br|\/p|\/div|\/li|\/tr|\/h\d|\/td|\/th)[^>]*>/gi, m => /td|th/i.test(m) ? '\t' : '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#64;|&commat;/g, '@').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
+    return t + '\n' + links.join('\n');
+  }
+  const deobfuscate = t => t.replace(/\s*[\[(]\s*at\s*[\])]\s*/gi, '@').replace(/\s*[\[(]\s*dot\s*[\])]\s*/gi, '.');
+  function segmentsOf(lines) {
+    return lines.flatMap(l => l.split(/\t|\s{3,}|\s[|·•]\s|;\s/)).map(x => clean(x).replace(/^[-–•*:,]+|[-–•*:,]+$/g, '').trim()).filter(Boolean);
+  }
+  const subParts = segs => segs.flatMap(sg => sg.split(/\s[—–-]\s|,\s|:\s*/)).map(x => x.replace(/^(contact|attn|name|phone|tel|call us|email|e-mail|mobile|website|web)\b\s*$/i, '').trim()).filter(Boolean);
+  function guessFromEmail(e) {
+    const [local, dom] = e.split('@');
+    const parts = local.split(/[._-]+/).filter(p => /^[a-z]{2,}$/i.test(p));
+    const name = parts.length >= 2 && !ROLE.has(local) ? parts.slice(0, 2).map(cap).join(' ') : '';
+    const company = FREE.has(dom) ? '' : cap(dom.split('.')[0].replace(/-/g, ' '));
+    return {name, company};
+  }
+  function extractLeads(input, sourceLabel) {
+    let text = String(input || '');
+    if (/<[a-z][\s\S]*>/i.test(text) && (text.match(/</g) || []).length > 5) text = htmlToText(text);
+    text = deobfuscate(text).replace(/\r/g, '');
+    const lines = text.split('\n').map(l => l.replace(/\s+$/, ''));
+    const emailLines = [];
+    lines.forEach((l, i) => { if ((l.match(EMAIL_G) || []).length) emailLines.push(i); });
+    const out = [], seen = new Set();
+    const mkLead = (blockLines, email) => {
+      const segs = segmentsOf(blockLines).filter(sg => !sg.includes('@'));
+      const blockText = blockLines.join('\n');
+      const phoneM = (blockText.replace(EMAIL_G, ' ').match(PHONE_G) || []).map(clean).find(p => { const d = p.replace(/\D/g, ''); return d.length >= 7 && d.length <= 15 && !/^(19|20)\d{2}$/.test(d); }) || '';
+      const urls = (blockText.replace(EMAIL_G, ' ').match(URL_G) || []).filter(u => !/\.(png|jpe?g|gif|svg)$/i.test(u));
+      const parts = subParts(segs);
+      const company = segs.find(sg => CO_RE.test(sg) && !STREET_RE.test(sg) && sg.length <= 70 && !TITLE_RE.test(sg.replace(CO_RE, '')) && !/:/.test(sg)) || '';
+      const name = parts.find(sg => sg !== company && NAME_RE.test(sg) && !CO_RE.test(sg) && !TITLE_RE.test(sg) && !STREET_RE.test(sg) && sg.split(' ').length <= 4) || '';
+      const title = parts.find(sg => sg !== name && sg !== company && TITLE_RE.test(sg) && sg.length <= 60 && !CO_RE.test(sg) && !NAME_RE.test(sg.replace(TITLE_RE, '').trim() || 'x')) || parts.find(sg => sg !== name && /^(owner|founder|ceo|president|partner|manager)$/i.test(sg)) || '';
+      const g = email ? guessFromEmail(email) : {name: '', company: ''};
+      return {name: name || g.name, email: email || '', phone: phoneM, company: company || g.company, title,
+        website: urls[0] ? cleanWebsite(urls[0]) : (email && !FREE.has(email.split('@')[1]) ? email.split('@')[1] : ''),
+        source: sourceLabel || 'Lead Extractor', guessed: !name && !!g.name};
+    };
+    // paragraphs separated by blank lines
+    const paras = []; let cur = [], start = 0;
+    lines.forEach((l, i) => { if (!l.trim()) { if (cur.length) paras.push({lines: cur, start}); cur = []; start = i + 1; } else cur.push(l); });
+    if (cur.length) paras.push({lines: cur, start});
+    const multi = paras.some(p => (p.lines.join('\n').match(EMAIL_G) || []).length > 1 && p.lines.length > 1);
+    if (!multi) {
+      paras.forEach(p => {
+        const emails = [...new Set((p.lines.join('\n').match(EMAIL_G) || []).map(e => e.toLowerCase()))].filter(e => !BAD_EMAIL_TLD.test(e));
+        if (emails.length) emails.forEach(e => { if (!seen.has(e)) { seen.add(e); out.push(mkLead(p.lines, e)); } });
+        else if (p.lines.length <= 8) { const l = mkLead(p.lines, ''); if (l.phone && (l.name || l.company)) out.push(l); }
+      });
+    } else {
+      emailLines.forEach((li, k) => {
+        const prev = k ? emailLines[k - 1] : -1, next = k < emailLines.length - 1 ? emailLines[k + 1] : lines.length;
+        const a = Math.max(prev + 1, li - 3), b = Math.min(next - 1, li + 3);
+        const block = lines.slice(a, b + 1).filter(l => l.trim());
+        // single-row tables: if the email line itself has several cells, use just that line
+        const useLine = segmentsOf([lines[li]]).length >= 3 ? [lines[li]] : block;
+        (lines[li].match(EMAIL_G) || []).map(e => e.toLowerCase()).filter(e => !BAD_EMAIL_TLD.test(e)).forEach(e => {
+          if (!seen.has(e)) { seen.add(e); out.push(mkLead(useLine, e)); }
+        });
+      });
+    }
+    return out;
+  }
+  function emailPatterns(first, last, domainIn) {
+    const f = letters(first), l = letters(last);
+    const d = cleanWebsite(domainIn || '').replace(/^.*@/, '');
+    if (!f || !d || !d.includes('.')) return [];
+    const p = [
+      [f, 'first'], ...(l ? [[`${f}.${l}`, 'first.last'], [`${f}${l}`, 'firstlast'], [`${f[0]}${l}`, 'flast'], [`${f[0]}.${l}`, 'f.last'], [`${f}${l[0]}`, 'firstl'], [`${f}_${l}`, 'first_last'], [`${l}`, 'last'], [`${l}.${f}`, 'last.first'], [`${l}${f[0]}`, 'lastf']] : []),
+    ];
+    return p.map(([local, pat]) => ({email: `${local}@${d}`, pattern: pat}));
   }
 
   function toCSV(rows) {
@@ -891,7 +1052,7 @@ const Scrub = (() => {
     }).join(',')).join('\r\n');
   }
 
-  return {FIELDS, FIELD_LABEL, parseCSV, rowsToTable, detectMapping, cleanRecord, analyze, build, options, sampleFiles, toCSV, jw, nameSim};
+  return {KEEP, extractLeads, emailPatterns, FIELDS, FIELD_LABEL, parseCSV, rowsToTable, detectMapping, cleanRecord, analyze, build, options, sampleFiles, toCSV, jw, nameSim};
 })();
 </script>
 
@@ -901,7 +1062,7 @@ const Scrub = (() => {
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const PAGE = 25;
-  const S = {files: [], recs: [], an: null, res: null, dec: {}, fdec: {}, choices: {}, tab: 'report', page: {clean: 0, log: 0}, q: {clean: '', log: ''}};
+  const S = {files: [], recs: [], an: null, res: null, dec: {}, fdec: {}, choices: {}, cOv: {}, cFilter: 'all', extracted: [], tab: 'report', page: {clean: 0, log: 0}, q: {clean: '', log: ''}};
 
   const ICON = {
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -920,12 +1081,15 @@ const Scrub = (() => {
   /* ---------- intake ---------- */
   function addFile(name, headers, rows) {
     if (!headers.length || !rows.length) { toast(`${name}: no rows found`); return; }
-    S.files.push({name, headers, rows, mapping: Scrub.detectMapping(headers)});
+    const mapping = Scrub.detectMapping(headers);
+    headers.forEach(h => { if (mapping[h] === Scrub.KEEP && rows.every(r => !String(r[h] || '').trim())) mapping[h] = ''; });
+    S.files.push({name, headers, rows, mapping});
     renderFiles();
   }
   function renderFiles() {
     $('#fileList').innerHTML = S.files.map((f, i) => `<div class="fchip"><b>${esc(f.name)}</b><span class="muted">${f.rows.length} rows</span><button data-rm="${i}" aria-label="Remove ${esc(f.name)}">✕</button></div>`).join('');
     $('#toMapBtn').disabled = !S.files.length;
+    $('#readyBar').classList.toggle('hidden', !S.files.length);
   }
   async function readFiles(list) {
     for (const file of list) {
@@ -968,9 +1132,102 @@ const Scrub = (() => {
   });
   $('#toMapBtn').addEventListener('click', () => { renderMap(); go(2); });
 
+  /* ---------- intake tabs ---------- */
+  document.querySelector('.itabs').addEventListener('click', e => {
+    const t = e.target.closest('.itab'); if (!t) return;
+    document.querySelectorAll('.itab').forEach(x => x.classList.toggle('on', x === t));
+    document.querySelectorAll('.ipane').forEach(p => p.classList.toggle('hidden', p.id !== 'ipane-' + t.dataset.itab));
+  });
+
+  /* ---------- lead extractor ---------- */
+  const EX_SAMPLE = `Austin Small Business Directory — Home Services
+
+Lone Star Roofing LLC
+Contact: Marcus Bell, Owner
+(512) 555-0141 · marcus@lonestarroofing.com
+www.lonestarroofing.com
+
+Hill Country Plumbing Co.
+Dana Whitfield
+Office Manager
+dana.whitfield@hillcountryplumbing.com | 512.555.0187
+1200 Congress Ave, Suite 4, Austin TX 78701
+
+Bluebonnet Electric
+info [at] bluebonnetelectric [dot] com
+Call us: 737-555-0122
+
+Davis Plumbing
+Laura Davis — Office Manager
+laura@davisplumbing.com
+512.555.0186
+
+Capital City Cleaners
+Phone: (512) 555-0199
+Owner: Teresa Lin`;
+  $('#exExample').addEventListener('click', () => { $('#exBox').value = EX_SAMPLE; $('#exSource').value = 'Austin business directory'; });
+  $('#exRun').addEventListener('click', () => {
+    const txt = $('#exBox').value; if (!txt.trim()) return toast('Paste some text first');
+    S.extracted = Scrub.extractLeads(txt, $('#exSource').value.trim() || 'Lead Extractor').map(l => ({...l, on: true}));
+    renderExtract();
+  });
+  function renderExtract() {
+    const L = S.extracted;
+    if (!L.length) { $('#exResult').innerHTML = `<div class="warn" style="margin-top:14px">No emails or phone numbers found in that text. Try copying the whole page, or the page source.</div>`; return; }
+    const n = L.filter(l => l.on).length;
+    $('#exResult').innerHTML = `<div class="spread" style="margin:18px 0 8px"><b>Found ${L.length} lead${L.length === 1 ? '' : 's'}</b>
+      <button class="btn primary sm" id="exAdd" ${n ? '' : 'disabled'}>Add ${n} lead${n === 1 ? '' : 's'} to my lists →</button></div>
+      <div class="tscroll" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th><input type="checkbox" class="cbx" id="exAll" ${n === L.length ? 'checked' : ''} aria-label="Select all"></th><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Title</th><th>Website</th></tr></thead><tbody>
+      ${L.map((l, i) => `<tr><td><input type="checkbox" class="cbx" data-ex="${i}" ${l.on ? 'checked' : ''}></td>
+        <td>${esc(l.name) || '<span class="muted">—</span>'}${l.guessed ? ' <span class="chip">from email</span>' : ''}</td><td class="mono">${esc(l.email) || '<span class="muted">—</span>'}</td>
+        <td class="mono" style="white-space:nowrap">${esc(l.phone) || '<span class="muted">—</span>'}</td><td>${esc(l.company)}</td><td>${esc(l.title)}</td><td class="mono">${esc(l.website)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="muted" style="font-size:12.5px;margin-top:8px">Untick anything that isn't a real lead. Names and phones get cleaned up in the next step.</div>`;
+  }
+  $('#exResult').addEventListener('change', e => {
+    if (e.target.id === 'exAll') S.extracted.forEach(l => l.on = e.target.checked);
+    else if (e.target.dataset.ex) S.extracted[+e.target.dataset.ex].on = e.target.checked;
+    renderExtract();
+  });
+  $('#exResult').addEventListener('click', e => {
+    if (!e.target.closest('#exAdd')) return;
+    const pick = S.extracted.filter(l => l.on);
+    const headers = ['Name', 'Email', 'Phone', 'Company', 'Job Title', 'Website', 'Lead Source'];
+    const rows = pick.map(l => ({Name: l.name, Email: l.email, Phone: l.phone, Company: l.company, 'Job Title': l.title, Website: l.website, 'Lead Source': l.source}));
+    const n = S.files.filter(f => f.name.startsWith('Extracted leads')).length;
+    addFile(n ? `Extracted leads ${n + 1}` : 'Extracted leads', headers, rows);
+    S.extracted = []; $('#exResult').innerHTML = ''; $('#exBox').value = '';
+    toast(`Added ${pick.length} leads — add your existing list too, then Continue`);
+  });
+
+  /* ---------- email finder ---------- */
+  function renderFinder() {
+    const f = $('#efFirst').value, l = $('#efLast').value, d = $('#efDomain').value;
+    const pats = Scrub.emailPatterns(f, l, d);
+    if (!pats.length) { $('#efResult').innerHTML = `<div class="muted" style="font-size:13px">Enter at least a first name and a website to see email guesses.</div>`; return; }
+    $('#efResult').innerHTML = `<div class="spread" style="margin-bottom:8px"><span class="muted" style="font-size:13px">Most common formats first</span><button class="btn sm" data-efcopyall>Copy all</button></div>
+      <div class="patlist">${pats.map((p, i) => `<div class="pat"><span><span class="mono">${esc(p.email)}</span><small>${p.pattern}${i === 0 && l ? '' : ''}${i === 1 ? ' · most common for companies' : ''}</small></span>
+        <span class="row" style="gap:4px"><button class="btn ghost sm" data-efcopy="${esc(p.email)}" title="Copy">⧉</button><button class="btn sm" data-efadd="${esc(p.email)}">+ Add</button></span></div>`).join('')}</div>`;
+  }
+  ['#efFirst', '#efLast', '#efDomain'].forEach(id => $(id).addEventListener('input', renderFinder));
+  renderFinder();
+  function copyText(t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied'), () => { prompt('Copy:', t); }); }
+  $('#efResult').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.efcopy) copyText(b.dataset.efcopy);
+    else if ('efcopyall' in b.dataset) copyText(Scrub.emailPatterns($('#efFirst').value, $('#efLast').value, $('#efDomain').value).map(p => p.email).join('\n'));
+    else if (b.dataset.efadd) {
+      const headers = ['Name', 'Email', 'Company', 'Website', 'Lead Source'];
+      const row = {Name: `${$('#efFirst').value} ${$('#efLast').value}`.trim(), Email: b.dataset.efadd, Company: $('#efCompany').value, Website: $('#efDomain').value, 'Lead Source': 'Email finder (unverified)'};
+      let f = S.files.find(x => x.name === 'Email finder leads');
+      if (f) { f.rows.push(row); renderFiles(); } else addFile('Email finder leads', headers, [row]);
+      toast(`Added ${b.dataset.efadd}`);
+    }
+  });
+
   /* ---------- mapping ---------- */
   function renderMap() {
-    const opts = sel => `<option value="">— Ignore —</option>` + Scrub.FIELDS.map(f => `<option value="${f.key}" ${sel === f.key ? 'selected' : ''}>${f.label}</option>`).join('');
+    const opts = sel => `<option value="">— Ignore —</option><option value="${Scrub.KEEP}" ${sel === Scrub.KEEP ? 'selected' : ''}>Keep as extra column</option>` + Scrub.FIELDS.map(f => `<option value="${f.key}" ${sel === f.key ? 'selected' : ''}>${f.label}</option>`).join('');
     $('#mapGrid').innerHTML = S.files.map((f, fi) => {
       const vals = Object.values(f.mapping);
       const noContact = !vals.includes('email') && !vals.includes('phone');
@@ -986,7 +1243,7 @@ const Scrub = (() => {
   $('#mapGrid').addEventListener('change', e => {
     const s = e.target.closest('select[data-file]'); if (!s) return;
     const f = S.files[+s.dataset.file];
-    if (s.value) Object.keys(f.mapping).forEach(h => { if (f.mapping[h] === s.value && h !== s.dataset.h) f.mapping[h] = ''; });
+    if (s.value && s.value !== Scrub.KEEP) Object.keys(f.mapping).forEach(h => { if (f.mapping[h] === s.value && h !== s.dataset.h) f.mapping[h] = ''; });
     f.mapping[s.dataset.h] = s.value; renderMap();
   });
   $('#backUpload').addEventListener('click', () => go(1));
@@ -995,13 +1252,17 @@ const Scrub = (() => {
     S.recs = []; let id = 0;
     S.files.forEach(f => f.rows.forEach(row => { S.recs.push(Scrub.cleanRecord(row, f.mapping, f.name, country, id++)); }));
     S.an = Scrub.analyze(S.recs);
-    S.dec = {}; S.fdec = {}; S.choices = {}; S.page = {clean: 0, log: 0}; S.q = {clean: '', log: ''};
+    S.dec = {}; S.fdec = {}; S.choices = {}; S.cOv = {}; S.cFilter = 'all'; S.page = {clean: 0, log: 0}; S.q = {clean: '', log: ''};
     S.tab = 'report';
     recompute(); go(3);
   });
 
   /* ---------- results ---------- */
-  function recompute() { S.res = Scrub.build(S.recs, S.an, S.dec, S.fdec); renderResults(); }
+  function recompute() { S.res = Scrub.build(S.recs, S.an, S.dec, S.fdec); applyContacted(); renderResults(); }
+  function applyContacted() {
+    S.res.clean.forEach(m => { if (m.key in S.cOv) m.contacted = S.cOv[m.key]; });
+    S.res.stats.contactedClean = S.res.clean.filter(m => m.contacted).length;
+  }
   function renderResults() {
     const st = S.res.stats;
     $('#resultSub').textContent = `${st.recordsIn} records from ${st.files} file${st.files === 1 ? '' : 's'} · ${new Date().toLocaleString()}`;
@@ -1010,7 +1271,7 @@ const Scrub = (() => {
       <div class="card stat"><div class="l">Duplicates removed</div><div class="n">${st.dupRemoved}</div><div class="s">${st.autoRemoved} auto · ${st.reviewRemoved} after review</div></div>
       <div class="card stat"><div class="l">Fields corrected</div><div class="n">${st.fieldsCorrected}</div><div class="s">across ${st.recordsCorrected} records</div></div>
       <div class="card stat"><div class="l">Needs review</div><div class="n" style="color:${st.needsReview ? 'var(--lilac)' : 'inherit'}">${st.needsReview}</div><div class="s">${st.pendingItems} matches · ${st.heldUndecided} flagged</div></div>
-      <div class="card stat hl"><div class="l">Clean leads out</div><div class="n">${st.clean}</div><div class="s">${st.excluded} excluded</div></div>`;
+      <div class="card stat hl"><div class="l">Clean leads out</div><div class="n">${st.clean}</div><div class="s">${st.clean - st.contactedClean} not contacted yet</div></div>`;
     $('#bClean').textContent = st.clean;
     $('#bReview').textContent = st.needsReview; $('#bReview').classList.toggle('alert', st.needsReview > 0);
     $('#bLog').textContent = st.fieldsCorrected;
@@ -1044,7 +1305,7 @@ const Scrub = (() => {
       <div class="flow">
         <div class="box"><div class="muted">Messy records in</div><div class="n">${st.recordsIn}</div></div>
         <div class="arrow">→</div>
-        <div class="box out"><div class="muted">Clean, CRM-ready leads</div><div class="n">${st.clean}</div><div class="muted" style="font-size:12.5px">${pct}% of the original list was duplicate, fake or incomplete</div></div>
+        <div class="box out"><div class="muted">Clean, CRM-ready leads</div><div class="n">${st.clean}</div><div class="muted" style="font-size:12.5px">${pct}% of the original list was duplicate, fake or incomplete · ${st.clean - st.contactedClean} ready to message, ${st.contactedClean} already contacted</div></div>
       </div>
       <div class="rgrid">
         <div class="rbox"><h3>Duplicates</h3>
@@ -1074,17 +1335,28 @@ const Scrub = (() => {
       <span class="row"><button class="btn sm" data-pg="${key}" data-d="-1" ${p === 0 ? 'disabled' : ''}>← Prev</button><button class="btn sm" data-pg="${key}" data-d="1" ${p >= pages - 1 ? 'disabled' : ''}>Next →</button></span></div>`;
   }
   function renderClean() {
-    const list = searchFilter(S.res.clean, S.q.clean, m => [m.fullName, m.email, m.phone, m.company, m.title, m.city].join(' '));
+    const base = S.res.clean.filter(m => S.cFilter === 'all' ? true : S.cFilter === 'todo' ? !m.contacted : m.contacted);
+    const list = searchFilter(base, S.q.clean, m => [m.fullName, m.email, m.phone, m.company, m.title, m.city, ...Object.values(m.extra || {})].join(' '));
+    const extraCols = [...new Set(S.res.clean.flatMap(m => Object.keys(m.extra || {})))];
     const p = S.page.clean, rows = list.slice(p * PAGE, (p + 1) * PAGE);
-    $('#panel-clean').innerHTML = `<div class="toolbar"><input type="search" id="qClean" placeholder="Search clean leads…" value="${esc(S.q.clean)}"></div>
-      <div class="card">${list.length ? `<div class="tscroll"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Title</th><th>Source</th><th>Notes</th></tr></thead><tbody>
-      ${rows.map(m => `<tr><td><b>${esc(m.fullName) || '<span class="muted">—</span>'}</b>${m.ids.length > 1 ? `<span class="merged" title="Merged from ${m.ids.length} records">×${m.ids.length}</span>` : ''}</td>
+    const nTodo = S.res.clean.filter(m => !m.contacted).length;
+    $('#panel-clean').innerHTML = `<div class="toolbar"><input type="search" id="qClean" placeholder="Search clean leads…" value="${esc(S.q.clean)}">
+      <select id="cFilter"><option value="all" ${S.cFilter === 'all' ? 'selected' : ''}>All leads (${S.res.clean.length})</option><option value="todo" ${S.cFilter === 'todo' ? 'selected' : ''}>Not contacted yet (${nTodo})</option><option value="done" ${S.cFilter === 'done' ? 'selected' : ''}>Already contacted (${S.res.clean.length - nTodo})</option></select></div>
+      <div class="card">${list.length ? `<div class="tscroll"><table><thead><tr><th title="Tick when you've messaged this lead">Contacted</th><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Title</th><th>Source</th>${extraCols.map(c => `<th>${esc(c)}</th>`).join('')}<th>Scrubbr flags</th></tr></thead><tbody>
+      ${rows.map(m => `<tr class="${m.contacted ? 'done' : ''}"><td style="text-align:center"><input type="checkbox" class="cbx" data-ck="${m.key}" ${m.contacted ? 'checked' : ''} aria-label="Contacted"></td><td><b>${esc(m.fullName) || '<span class="muted">—</span>'}</b>${m.ids.length > 1 ? `<span class="merged" title="Merged from ${m.ids.length} records">×${m.ids.length}</span>` : ''}</td>
         <td class="mono">${esc(m.email) || '<span class="muted">—</span>'}</td><td class="mono" style="white-space:nowrap">${esc(m.phone) || '<span class="muted">—</span>'}</td>
         <td>${esc(m.company) || '<span class="muted">—</span>'}</td><td>${esc(m.title)}</td><td class="muted" style="font-size:12.5px">${m.sources.map(esc).join('<br>')}</td>
+        ${extraCols.map(c => `<td>${esc((m.extra || {})[c] || '')}</td>`).join('')}
         <td>${m.warnings.map(w => `<span class="chip amber">${esc(w)}</span>`).join('')}${m.blocking.length ? '<span class="chip green">Approved</span>' : ''}</td></tr>`).join('')}
       </tbody></table></div>` : `<div class="empty">No clean leads match.</div>`}</div>${pager('clean', list.length)}`;
     bindSearch('#qClean', 'clean');
+    $('#cFilter').addEventListener('change', e => { S.cFilter = e.target.value; S.page.clean = 0; renderResults(); });
   }
+  $('#panel-clean').addEventListener('change', e => {
+    const c = e.target.closest('[data-ck]'); if (!c) return;
+    S.cOv[c.dataset.ck] = c.checked; applyContacted();
+    const y = window.scrollY; renderResults(); window.scrollTo(0, y);
+  });
   function bindSearch(sel, key) {
     const inp = $(sel); if (!inp) return;
     inp.addEventListener('input', () => { S.q[key] = inp.value; S.page[key] = 0; const pos = inp.selectionStart; renderResults(); const n = $(sel); n.focus(); n.setSelectionRange(pos, pos); });
@@ -1228,16 +1500,19 @@ const Scrub = (() => {
   }
   const stamp = () => new Date().toISOString().slice(0, 10);
   $('#dlClean').addEventListener('click', () => {
-    const fmt = $('#crmFormat').value;
+    const fmt = $('#crmFormat').value, which = $('#expWhich').value;
     const H = {
-      generic: ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Job Title', 'Website', 'City', 'Lead Source', 'Merged Records', 'Scrubbr Notes'],
-      hubspot: ['First Name', 'Last Name', 'Email', 'Phone Number', 'Company Name', 'Job Title', 'Website URL', 'City', 'Lead Source', 'Merged Records', 'Scrubbr Notes'],
-      salesforce: ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Title', 'Website', 'City', 'Lead Source', 'Merged Records', 'Description'],
+      generic: ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Job Title', 'Website', 'City', 'Lead Source', 'Contacted', 'Merged Records', 'Scrubbr Notes'],
+      hubspot: ['First Name', 'Last Name', 'Email', 'Phone Number', 'Company Name', 'Job Title', 'Website URL', 'City', 'Lead Source', 'Contacted', 'Merged Records', 'Scrubbr Notes'],
+      salesforce: ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Title', 'Website', 'City', 'Lead Source', 'Contacted', 'Merged Records', 'Description'],
     }[fmt];
-    const rows = S.res.clean.map(m => [m.firstName, m.lastName || (fmt === 'salesforce' ? '[not provided]' : ''), m.email, m.phone,
-      m.company || (fmt === 'salesforce' ? '[not provided]' : ''), m.title, m.website, m.city, m.sources.join('; '), m.ids.length, m.warnings.join('; ')]);
-    download(`scrubbr_clean_leads_${fmt}_${stamp()}.csv`, Scrub.toCSV([H, ...rows]));
-    toast(`Exported ${rows.length} clean leads`);
+    const list = S.res.clean.filter(m => which === 'all' || !m.contacted);
+    const extraCols = [...new Set(list.flatMap(m => Object.keys(m.extra || {})))];
+    const rows = list.map(m => [m.firstName, m.lastName || (fmt === 'salesforce' ? '[not provided]' : ''), m.email, m.phone,
+      m.company || (fmt === 'salesforce' ? '[not provided]' : ''), m.title, m.website, m.city, m.sources.join('; '), m.contacted ? 'Yes' : 'No', m.ids.length, m.warnings.join('; '),
+      ...extraCols.map(c => (m.extra || {})[c] || '')]);
+    download(`scrubbr_${which === 'todo' ? 'to_contact' : 'clean_leads'}_${fmt}_${stamp()}.csv`, Scrub.toCSV([[...H, ...extraCols], ...rows]));
+    toast(`Exported ${rows.length} leads`);
   });
   $('#dlReview').addEventListener('click', () => {
     const H = ['Status', 'Reason', 'Name', 'Email', 'Phone', 'Company', 'Title', 'Source File'];
@@ -1258,6 +1533,7 @@ const Scrub = (() => {
   function printReport() { S.tab = 'report'; renderResults(); setTimeout(() => window.print(), 50); }
   $('#printBtn').addEventListener('click', printReport);
 
+  renderFiles();
   go(1);
 })();
 </script>
